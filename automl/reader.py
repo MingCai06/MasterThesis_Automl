@@ -9,8 +9,10 @@ from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
 from sklearn.model_selection import train_test_split as tts
 
-#import local function
-from util import log, timeit,mprint
+# import local function
+from util import log, timeit, mprint
+from imputation import Imputation
+
 
 def convert_list(serie):
 
@@ -61,8 +63,8 @@ def convert_float_and_dates(serie):
             float)  # TODO: be careful with nan ! object or float ??
 
         df[serie.name + "_HOUR"] = pandas.DatetimeIndex(serie).hour.astype(float) + \
-                                   pandas.DatetimeIndex(serie).minute.astype(float)/60. + \
-                                   pandas.DatetimeIndex(serie).second.astype(float)/3600.
+            pandas.DatetimeIndex(serie).minute.astype(float) / 60. + \
+            pandas.DatetimeIndex(serie).second.astype(float) / 3600.
 
         return df
 
@@ -106,8 +108,8 @@ def convert_float_and_dates(serie):
                     float)  # TODO: be careful with nan ! object or float??
 
                 df[serie.name + "_HOUR"] = serie_to_df.hour.astype(float) + \
-                                           serie_to_df.minute.astype(float)/60. + \
-                                           serie_to_df.second.astype(float) / 3600.
+                    serie_to_df.minute.astype(float) / 60. + \
+                    serie_to_df.second.astype(float) / 3600.
 
                 return df
 
@@ -137,8 +139,8 @@ class Reader():
                  to_hdf5=False,
                  to_path="save",
                  verbose=True,
-                 miss_values = None,
-                 missing_threshold = 0.8):
+                 miss_values=None,
+                 missing_threshold=0.8):
 
         self.sep = sep
         self.header = header
@@ -146,14 +148,11 @@ class Reader():
         self.to_path = to_path
         self.verbose = verbose
         self.miss_values = miss_values
-        self.unexpected_missing_values = ["?","n/a", "na", "--"]
+        self.unexpected_missing_values = ["?", "n/a", "na", "--"]
         self.missing_threshold = missing_threshold
 
-
-
     @timeit
-    def clean(self, path, drop_duplicate=False, drop_high_missing = False):
-
+    def pre_clean(self, path, drop_duplicate=False, drop_high_missing=False):
         """Reads and cleans data (accepted formats : csv, xls, json and h5):
         - del Unnamed columns
         - casts lists into variables
@@ -198,7 +197,7 @@ class Reader():
                                      header=self.header,
                                      engine='c',
                                      error_bad_lines=False,
-                                     na_values = self.miss_values
+                                     na_values=self.miss_values
                                      )
 
             elif (type_doc == 'xls'):
@@ -206,9 +205,9 @@ class Reader():
                 if (self.verbose):
                     print("")
                     print("reading xls : " + path.split("/")[-1] + " ...")
-                df = pd.read_excel(path, header=self.header, 
-                                    na_values=self.missing_values
-                                    )
+                df = pd.read_excel(path, header=self.header,
+                                   na_values=self.missing_values
+                                   )
 
             else:
                 raise ValueError("The document extension cannot be handled")
@@ -249,7 +248,7 @@ class Reader():
 
         if (drop_high_missing):
             if(self.verbose):
-                print(f'dropping columns with high missing rate: {self.missing_threshold}')     
+                print(f'dropping columns with high missing rate: {self.missing_threshold}')
             pct_null = df.isnull().sum() / len(df)
             missing_features = pct_null[pct_null > self.missing_threshold].index
             df.drop(missing_features, axis=1, inplace=True)
@@ -259,8 +258,7 @@ class Reader():
         return df
 
     @timeit
-    def read_split(self, Lpath,target_name):
-
+    def read_split(self, Lpath, target_name):
         """Creates train and test datasets
          Parameters
         ----------
@@ -286,7 +284,6 @@ class Reader():
         y_train = dict()
         y_test = dict()
 
-
         if (type(Lpath) != list):
 
             raise ValueError("You must specify a list of paths "
@@ -307,19 +304,19 @@ class Reader():
 
                 # Reading each file
 
-                df = self.clean(path, drop_duplicate=False)
+                df = self.pre_clean(path, drop_duplicate=False)
 
                 # Checking if the target exists to split into test and train
 
                 if (target_name in df.columns):
 
                     is_null = df[target_name].isnull()
-                    train, test = tts(df, test_size = 0.33)
+                    train, test = tts(df, test_size=0.33, random_state=42)
 
                     df_train[path] = train[~is_null].drop(target_name, axis=1)
                     df_test[path] = test.drop(target_name, axis=1)
                     y_train[path] = train[target_name][~is_null]
-                    y_test[path] =  test[target_name][~is_null]
+                    y_test[path] = test[target_name][~is_null]
 
                 else:
 
@@ -339,7 +336,6 @@ class Reader():
                       for path in df_test.keys()]) == 0) & (self.verbose)):
                 print("")
                 print("You have no test dataset !")
-
 
             # Finding the common subset of features
 
@@ -388,7 +384,7 @@ class Reader():
                 raise ValueError("Your test target contains more than two columns !"
                                  " Please check that only one column "
                                  "is named " + target_name)
-            
+
             else:
                 pass
 
@@ -432,11 +428,11 @@ class Reader():
             # Missing values
 
             sparse_features = (df_train.isnull().sum()
-                                / df_train.shape[0]
+                               / df_train.shape[0]
                                ).sort_values(ascending=False)
             sparse_features_test = (df_test.isnull().sum()
-                                / df_test.shape[0]
-                               ).sort_values(ascending=False)
+                                    / df_test.shape[0]
+                                    ).sort_values(ascending=False)
 
             sparse = True
             if(sparse_features.max() == 0.0):
@@ -456,25 +452,23 @@ class Reader():
                     print("")
                     print("> You have no missing values on train set...")
 
-           
-
             high_missing_features = sparse_features[sparse_features > 0.8].index
             high_missing_features_test = sparse_features_test[sparse_features_test > 0.8].index
 
             if len(high_missing_features) > 0:
                 if(self.verbose):
                     print("")
-                    print(f'dropping training set columns with high missing rate: {self.missing_threshold}...') 
+                    print(f'dropping training set columns with high missing rate: {self.missing_threshold}...')
                     print(F'drop {len(high_missing_features)} columns')
-                    print(high_missing_features)               
+                    print(high_missing_features)
                 df_train.drop(high_missing_features, axis=1, inplace=True)
 
             if len(high_missing_features_test) > 0:
                 if(self.verbose):
                     print("")
-                    print(f'dropping test set columns with high missing rate: {self.missing_threshold}...') 
+                    print(f'dropping test set columns with high missing rate: {self.missing_threshold}...')
                     print(F'drop {len(high_missing_features_test)} columns')
-                    print(high_missing_features_test)               
+                    print(high_missing_features_test)
                 df_test.drop(high_missing_features_test, axis=1, inplace=True)
 
             else:
@@ -491,12 +485,11 @@ class Reader():
                 print("> Number of training samples : " + str(df_train.shape[0]))
                 print("> Number of test samples : " + str(df_test.shape[0]))
 
-            
             ##############################################################
             #                    Encoding target
             ##############################################################
 
-            task = "regression"
+            task = "classification"
 
             if (y_train.nunique() <= 2):
                 task = "classification"
@@ -529,9 +522,9 @@ class Reader():
                 print("training set encoding finished")
 
                 y_test = pd.Series(enc.fit_transform(y_test.values),
-                                    index=y_test.index,
-                                    name=target_name,
-                                    dtype='int')
+                                   index=y_test.index,
+                                   name=target_name,
+                                   dtype='int')
                 print("test set encoding finished")
 
             else:
@@ -581,7 +574,15 @@ class Reader():
             else:
                 pass
 
+            if (self.verbose):
+                print("")
+                print("Impute the Missing Values...")
+                imp = Imputation()
+                df_train = imp.fit_transform(df_train)
+                df_test = imp.fit_transform(df_test)
+                print("")
+
             return {"train": df_train,
                     "test": df_test,
                     "target": y_train,
-                    "y_test":y_test}
+                    "y_test": y_test}
