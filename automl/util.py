@@ -6,6 +6,7 @@ from typing import Any
 nesting_level = 0
 is_start = None
 
+
 class Timer:
     def __init__(self):
         self.start = time.time()
@@ -15,6 +16,7 @@ class Timer:
         current = time.time()
         log(f"[{info}] spend {current - self.history[-1]:0.2f} sec")
         self.history.append(current)
+
 
 def timeit(method, start_log=None):
     def timed(*args, **kw):
@@ -46,6 +48,7 @@ def log(entry: Any):
     space = "-" * (4 * nesting_level)
     print(f"{space}{entry}")
 
+
 def show_dataframe(df):
     if len(df) <= 30:
         print(f"content=\n"
@@ -59,12 +62,10 @@ def show_dataframe(df):
     else:
         print(f"dataframe is too wide to show the dtypes, over {len(df.dtypes)} columns")
 
+
 # log function
 def mprint(msg):
     """info"""
     from datetime import datetime
     cur_time = datetime.now().strftime('%m-%d %H:%M:%S')
     print(f"INFO  [{cur_time}] {msg}")
-
-
-
