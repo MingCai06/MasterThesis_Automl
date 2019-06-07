@@ -1,4 +1,0 @@
-scikit-optimize
-scikit-learn==0.20.3
-catboost
-lightgbm
