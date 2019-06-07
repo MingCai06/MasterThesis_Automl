@@ -3,7 +3,7 @@ import warnings
 from copy import copy
 
 import pandas as pd
-#from lightgbm import LGBMClassifier
+from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 # utility for early stopping with a validation set
