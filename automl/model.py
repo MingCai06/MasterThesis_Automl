@@ -3,7 +3,7 @@ import warnings
 from copy import copy
 
 import pandas as pd
-from lightgbm import LGBMClassifier
+#from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
 
 # utility for early stopping with a validation set
@@ -29,8 +29,12 @@ class Classifier():
     def __init__(self, **params):
 
         if ("strategy" in params):
-            self.__strategy = params["strategy"]
+            if params["strategy"] in ['LightGBM', 'RandomForest']:
+                self.__strategy = params["strategy"]
+            else:
+                warnings.warn('The Strategy should be LightGBM or RandomForest,defalut model <LightGBM> will be used!')
         else:
+            print('You donot give any Model Strategy, defalut model <LightGBM> will be used!')
             self.__strategy = "LightGBM"
 
         self.__classif_params = {}
@@ -301,22 +305,28 @@ class Classifier():
 
         return copy(self.__classifier)
 
-    # def get_search_spaces(self):
-    #     search_params = {
-    #         "LightGBM": {
-    #             'num_iterations': Integer(10, 100),
-    #             "boosting_type": Categorical(categories=['gbdt', 'dart']),
-    #             "learning_rate": Real(0.01, 0.5, 'log-uniform'),
-    #             'num_leaves': Integer(10, 200),
-    #             'max_depth': Integer(0, 500),
-    #             "feature_fraction": Real(0.5, 1.0),
-    #             "bagging_fraction": Real(0.5, 1.0),
-    #             "bagging_freq": Integer(0, 50),
-    #             'reg_alpha': Real(1e-9, 2, 'log-uniform'),
-    #             "reg_lambda": Real(1e-9, 10, 'log-uniform'),
-    #             'min_child_weight': Integer(0, 50)
-    #         }
-    #     }
-    #     strategy = self.__strategy
-    #     params = search_params[strategy]
-    #     return params
+    def get_search_spaces(self):
+        model = self.get_estimator()
+        search_params = {
+            "LightGBM": {
+                "model": Categorical([model]),
+                "model__class_weight": Categorical(categories=['balanced', None]),
+                "model__learning_rate": Real(0.01, 1.0),
+                "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
+                "model__n_estimators": Integer(10, 500),
+                "model__min_samples_split": Integer(2, 10),
+                "model__min_samples_leaf": Integer(1, 10),
+                "model__min_child_weight": Integer(0, 50)
+            },
+            "RandomForest": {
+                "model": Categorical([model]),
+                "model__n_estimators": Integer(10, 200),
+                "model__min_samples_split": Integer(2, 10),
+                "model__min_samples_leaf": Integer(1, 10),
+                "model__max_features": Categorical(categories=['sqrt', 'log2', None])
+            }
+        }
+
+        strategy = self.__strategy
+        params = search_params[strategy]
+        return params
