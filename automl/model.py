@@ -39,7 +39,6 @@ class Classifier():
             self.__strategy = "LightGBM"
 
         self.__classif_params = {}
-
         self.__classifier = None
         self.__set_classifier(self.__strategy)
         self.__col = None
@@ -306,27 +305,50 @@ class Classifier():
 
         return copy(self.__classifier)
 
-    def get_search_spaces(self):
+    def get_search_spaces(self, need_feature_selection=False):
         model = self.get_estimator()
-        search_params = {
-            "LightGBM": {
-                "model": Categorical([model]),
-                "model__class_weight": Categorical(categories=['balanced', None]),
-                "model__learning_rate": Real(0.01, 1.0),
-                "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
-                "model__n_estimators": Integer(10, 500),
-                "model__min_samples_split": Integer(2, 10),
-                "model__min_samples_leaf": Integer(1, 10),
-                "model__min_child_weight": Integer(0, 50)
-            },
-            "RandomForest": {
-                "model": Categorical([model]),
-                "model__n_estimators": Integer(10, 200),
-                "model__min_samples_split": Integer(2, 10),
-                "model__min_samples_leaf": Integer(1, 10),
-                "model__max_features": Categorical(categories=['sqrt', 'log2', None])
+        if need_feature_selection is True:
+           search_params = {
+                "LightGBM": {
+                    "model": Categorical([model]),
+                    "model__class_weight": Categorical(categories=['balanced', None]),
+                    "model__learning_rate": Real(0.01, 1.0),
+                    "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
+                    "model__n_estimators": Integer(10, 500),
+                    "model__min_samples_split": Integer(2, 10),
+                    "model__min_samples_leaf": Integer(1, 10),
+                    "model__min_child_weight": Integer(0, 50),
+                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                },
+                "RandomForest": {
+                    "model": Categorical([model]),
+                    "model__n_estimators": Integer(10, 200),
+                    "model__min_samples_split": Integer(2, 10),
+                    "model__min_samples_leaf": Integer(1, 10),
+                    "model__max_features": Categorical(categories=['sqrt', 'log2', None]),
+                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                }
             }
-        }
+        else:
+            search_params = {
+                "LightGBM": {
+                    "model": Categorical([model]),
+                    "model__class_weight": Categorical(categories=['balanced', None]),
+                    "model__learning_rate": Real(0.01, 1.0),
+                    "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
+                    "model__n_estimators": Integer(10, 500),
+                    "model__min_samples_split": Integer(2, 10),
+                    "model__min_samples_leaf": Integer(1, 10),
+                    "model__min_child_weight": Integer(0, 50)
+                },
+                "RandomForest": {
+                    "model": Categorical([model]),
+                    "model__n_estimators": Integer(10, 200),
+                    "model__min_samples_split": Integer(2, 10),
+                    "model__min_samples_leaf": Integer(1, 10),
+                    "model__max_features": Categorical(categories=['sqrt', 'log2', None])
+                }
+            }
 
         strategy = self.__strategy
         params = search_params[strategy]
