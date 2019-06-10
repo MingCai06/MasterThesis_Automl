@@ -32,7 +32,8 @@ class Classifier():
             if params["strategy"] in ['LightGBM', 'RandomForest']:
                 self.__strategy = params["strategy"]
             else:
-                warnings.warn('The Strategy should be LightGBM or RandomForest,defalut model <LightGBM> will be used!')
+                raise ValueError("Strategy invalid. Please choose between "
+                                 "'LightGBM' or 'RandomForest'")
         else:
             print('You donot give any Model Strategy, defalut model <LightGBM> will be used!')
             self.__strategy = "LightGBM"
