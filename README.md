@@ -14,6 +14,8 @@ This is a repository of my master thesis.
 
 # Usage
 # Automated Reading and Data Cleaning
+In this step, the data will be read, at the same time, target will be encoded with `LabelEnocoder` and the missing values will be imputed with most frequent value for categorical and mean/median for numerical values.
+ 
 ```python
 import reader
 
@@ -29,5 +31,10 @@ reader = reader.Reader(sep=info['table_sep'],
 
 data = reader.read_split(["../../data.csv"], target_name=info['target_name'])
 
+# data is a dictionary 
+# data = {"train": df_train,
+#         "test": df_test,
+#         "target": y_train,
+#         "y_test": y_test}
 
 ```
