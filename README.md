@@ -3,7 +3,7 @@
 This is a repository of my master thesis.
 
 # AutoML Architecture
-
+![pic][./pic/automl_archi.png]
 
 # Requirement
 + Python 3
@@ -15,7 +15,7 @@ This is a repository of my master thesis.
 # Usage
 # Automated Reading and Data Cleaning
 In this step, the data will be read, at the same time, target will be encoded with `LabelEnocoder` and the missing values will be imputed with most frequent value for categorical and mean/median for numerical values.
- 
+
 ```python
 import reader
 
