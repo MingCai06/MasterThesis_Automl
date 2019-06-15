@@ -3,7 +3,8 @@
 This is a repository of my master thesis.
 
 # AutoML Architecture
-![pic][./pic/automl_archi.png]
+![pic]![alt text](https://raw.githubusercontent.com/MingCai06/MasterThesis_Automl/master/pic/automl_archi.png)
+
 
 # Requirement
 + Python 3
