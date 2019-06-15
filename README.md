@@ -3,7 +3,7 @@
 This is a repository of my master thesis.
 
 # AutoML Architecture
-![pic]![alt text](https://github.com/MingCai06/MasterThesis_Automl/master/pic/automl_archi.png)
+![alt text](https://github.com/MingCai06/MasterThesis_Automl/blob/master/pic/automl_archi.png)
 
 
 # Requirement
