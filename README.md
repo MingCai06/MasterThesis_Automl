@@ -1,6 +1,6 @@
-# MasterThesis_Automl
+# MasterThesis_Automl(in processing)
 
-This is a repository of my masters' thesis.
+This is a repository of my master thesis.
 
 # AutoML FrameWork
 ![AutoML FrameWork](https://github.com/MingCai06/_Automl/blob/master/pic/automl_archi.png)
