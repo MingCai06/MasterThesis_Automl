@@ -25,7 +25,7 @@ from skopt.callbacks import VerboseCallback  # Callback to control the verbosity
 from skopt.callbacks import DeltaXStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
 
 # import local function
-from util import log, timeit, mprint
+from util import log, timeit, mprint, write_result
 from encoder import Categorical_encoder
 from scaling import Scaler
 from model import Classifier
