@@ -1,10 +1,10 @@
-import pickle
 import time
 from typing import Any
-import json
 import os
 from os.path import join, isfile
 import sys
+from sklearn.externals.joblib import dump, load
+
 
 nesting_level = 0
 is_start = None
@@ -117,11 +117,16 @@ def init_dirs():
     return dirs
 
 
-def write_result(data):
+def dump_result(data):
     dirs = init_dirs()
+    path = join(dirs['output'])
     datanames = sorted(os.listdir(dirs['data']))[0].split(".")[0]
     timestr = time.strftime("%Y%m%d%H%M%S")
     filename = datanames + timestr + '.json'
+    dump(data, (path + '/' + filename))
 
-    with open(join(dirs['output'], filename), 'w', encoding='utf-8') as json_file:
-        json.dump(data, json_file)
+
+def load_result(filename):
+    dirs = init_dirs()
+    path = join(dirs['output'])
+    return load(path + '/' + filename)
