@@ -1,4 +1,3 @@
-
 import pickle
 import os
 import time
@@ -71,7 +70,6 @@ def convert_float_and_dates(serie):
     else:
 
         # Convert float
-
         try:
             serie = serie.apply(float)
 
