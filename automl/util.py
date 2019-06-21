@@ -1,7 +1,10 @@
-import os
 import pickle
 import time
 from typing import Any
+import json
+import os
+from os.path import join, isfile
+import sys
 
 nesting_level = 0
 is_start = None
@@ -69,3 +72,56 @@ def mprint(msg):
     from datetime import datetime
     cur_time = datetime.now().strftime('%m-%d %H:%M:%S')
     print(f"INFO  [{cur_time}] {msg}")
+
+
+# wirte result
+def init_dirs():
+
+    if len(sys.argv) == 1:
+        # default local
+        root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
+        dirs = {
+            'data': join(root_dir, 'data'),
+            'output': join(root_dir, 'result_output'),
+            'prediction': join(root_dir, 'predictions')
+        }
+
+    elif len(sys.argv) == 3:
+        # default local
+        root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
+        dirs = {
+            'data': join(root_dir, 'data'),
+            'output': join(root_dir, 'result_output'),
+            'prediction': join(root_dir, 'predictions')
+        }
+
+    elif len(sys.argv) == 3:
+        # codalab
+        dirs = {
+            'data': join(sys.argv[1], 'data'),
+            'output': sys.argv[2],
+            'prediction': join(sys.argv[1], 'res')
+        }
+
+    elif len(sys.argv) == 5 and sys.argv[1] == 'local':
+        # full call in local
+        dirs = {
+            'prediction': join(sys.argv[2]),
+            'ref': join(sys.argv[3]),
+            'output': sys.argv[4]
+        }
+    else:
+        raise ValueError("Wrong number of arguments")
+
+    os.makedirs(dirs['output'], exist_ok=True)
+    return dirs
+
+
+def write_result(data):
+    dirs = init_dirs()
+    datanames = sorted(os.listdir(dirs['data']))[0].split(".")[0]
+    timestr = time.strftime("%Y%m%d%H%M%S")
+    filename = datanames + timestr + '.json'
+
+    with open(join(dirs['output'], filename), 'w', encoding='utf-8') as json_file:
+        json.dump(data, json_file)
