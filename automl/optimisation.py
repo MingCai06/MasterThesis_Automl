@@ -237,12 +237,12 @@ search_space_LGB = Classifier(strategy = "LightGBM").get_search_spaces()
 
                     if set_callbacks is True:
 
-                        mid_result = self.report_perf(opt, X, df_target, ' with baseEstimator:' + baseEstimator,
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
                                                       callbacks=[DeltaXStopper(0.0001)
                                                                  #, DeadlineStopper(60 * 5)
                                                                  ])
                     else:
-                        mid_result = self.report_perf(opt, X, df_target, ' with baseEstimator: ' + baseEstimator,
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,
                                                       )
                     tuning_result[baseEstimator] = mid_result
 
@@ -253,7 +253,7 @@ search_space_LGB = Classifier(strategy = "LightGBM").get_search_spaces()
         print("")
         print('######## Congratulations! Here is the Best Parameters: #######')
         print('Best Score is:', tuning_result[best_base_estimator]['best_score'])
-        print(pipe.get_params()['model'].__class__.__name__ + ' with baseEstimator ' + best_base_estimator)
+        print(' with Surrogate Model ' + best_base_estimator)
         pprint.pprint(best_param)
         return best_param, tuning_result
 
