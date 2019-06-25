@@ -5,6 +5,7 @@ from copy import copy
 import pandas as pd
 from lightgbm import LGBMClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 
 # utility for early stopping with a validation set
 from sklearn.model_selection import train_test_split
@@ -29,7 +30,7 @@ class Classifier():
     def __init__(self, **params):
 
         if ("strategy" in params):
-            if params["strategy"] in ['LightGBM', 'RandomForest']:
+            if params["strategy"] in ['LightGBM', 'RandomForest','SVC']:
                 self.__strategy = params["strategy"]
             else:
                 raise ValueError("Strategy invalid. Please choose between "
@@ -104,6 +105,8 @@ class Classifier():
         elif self.__strategy == "RandomForest":
             self.__classifier = RandomForestClassifier(random_state=0)
 
+        elif self.__strategy == "SVC":
+            self.__classifier == SVC(random_state=0)
         # Here can add other classfier
         # elif(self.strategy =="")
 
@@ -145,7 +148,12 @@ class Classifier():
 
         elif (strategy == "RandomForest"):
             self.__classifier.fit(df_train.values, y_train)
-            self.__classifier = df_train.columns
+            self.__col = df_train.columns
+            self.__fitOK = True
+
+        elif (strategy == "SVC"):
+            self.classifier.fit(df_train.values, y_train)
+            self.__col = df.train.columns
             self.__fitOK = True
 
         return self
@@ -302,7 +310,6 @@ class Classifier():
             raise ValueError("You must call the fit function before !")
 
     def get_estimator(self):
-
         return copy(self.__classifier)
 
     def get_search_spaces(self, need_feature_selection=False):
@@ -327,6 +334,15 @@ class Classifier():
                     "model__min_samples_leaf": Integer(1, 10),
                     "model__max_features": Categorical(categories=['sqrt', 'log2', None]),
                     "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                },
+                "SVC": {
+                    "model": Categorical([model]),
+                    "model__class_weight": Categorical(categories=['balanced',None]),
+                    'model__C': (1e-6, 1e+6, 'log-uniform'),  
+                    'model__gamma': (1e-6, 1e+1, 'log-uniform'),
+                    'model__degree': (1, 8), 
+                    'model__kernel': ['linear', 'poly', 'rbf'],
+                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
                 }
             }
         else:
@@ -347,6 +363,14 @@ class Classifier():
                     "model__min_samples_split": Integer(2, 10),
                     "model__min_samples_leaf": Integer(1, 10),
                     "model__max_features": Categorical(categories=['sqrt', 'log2', None])
+                },
+                "SVC": {
+                    "model": Categorical([model]),
+                    "model__class_weight": Categorical(categories=['balanced',None]),
+                    'model__C': (1e-6, 1e+6, 'log-uniform'),  
+                    'model__gamma': (1e-6, 1e+1, 'log-uniform'),
+                    'model__degree': (1, 8), 
+                    'model__kernel': ['linear', 'poly', 'rbf'],
                 }
             }
 
