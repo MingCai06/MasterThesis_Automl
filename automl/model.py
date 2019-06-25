@@ -77,7 +77,7 @@ class Classifier():
                                   str(self.__strategy) +
                                   ". Parameter IGNORED. Check the list of "
                                   "available parameters with "
-                                  "`classifier.get_params().keys()`")
+                                  "`Classifier().get_params().keys()`")
                 else:
                     setattr(self.__classifier, k, v)
 
@@ -102,16 +102,16 @@ class Classifier():
         if(strategy == "LightGBM"):
             self.__classifier = LGBMClassifier(objective="binary", nthread=-1, seed=0)
 
-        elif self.__strategy == "RandomForest":
+        elif (strategy == "RandomForest"):
             self.__classifier = RandomForestClassifier(random_state=0)
 
-        elif self.__strategy == "SVC":
-            self.__classifier == SVC(random_state=0)
+        elif (strategy == "SVC"):
+            self.__classifier = SVC(random_state=0)
         # Here can add other classfier
         # elif(self.strategy =="")
 
         else:
-            raise valueError(
+            raise ValueError(
                 "Strategy invalid. Please choose'LightGBM'")
 
     def fit(self, df_train, y_train):
@@ -142,7 +142,6 @@ class Classifier():
             self.__classifier.fit(df_train_train.values, y_train_train,
                                   eval_set=[(df_val.values, y_val)],
                                   early_stopping_rounds=100)
-
             self.__col = df_train_train.columns
             self.__fitOK = True
 
@@ -152,7 +151,7 @@ class Classifier():
             self.__fitOK = True
 
         elif (strategy == "SVC"):
-            self.classifier.fit(df_train.values, y_train)
+            self.__classifier.fit(df_train.values, y_train)
             self.__col = df.train.columns
             self.__fitOK = True
 
