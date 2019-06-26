@@ -117,12 +117,15 @@ def init_dirs():
     return dirs
 
 
-def dump_result(data):
+def dump_result(data, custom_name=None, save_with_time=False):
     dirs = init_dirs()
     path = join(dirs['output'])
     datanames = sorted(os.listdir(dirs['data']))[0].split(".")[0]
     timestr = time.strftime("%Y%m%d%H%M%S")
-    filename = datanames + timestr + '.json'
+    if save_with_time is True:
+        filename = datanames + custom_name + timestr + '.json'
+    else:
+        filename = datanames + custom_name + '.json'
     dump(data, (path + '/' + filename))
 
 
