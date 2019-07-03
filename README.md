@@ -2,7 +2,7 @@
 
 This is a repository of my master thesis.
 
-# AutoML FrameWork
+# AutoML for binary classification tasks
 ![AutoML FrameWork](https://github.com/MingCai06/MasterThesis_Automl/blob/master/pic/Automl_Flowdiagramm.jpg)
 
 
