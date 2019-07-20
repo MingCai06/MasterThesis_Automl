@@ -106,7 +106,7 @@ class Classifier():
             self.__classifier = RandomForestClassifier(random_state=0)
 
         elif (strategy == "SVC"):
-            self.__classifier = SVC(random_state=0)
+            self.__classifier = SVC(max_iter=1000,random_state=0)
         # Here can add other classfier
         # elif(self.strategy =="")
 
@@ -348,13 +348,17 @@ class Classifier():
             search_params = {
                 "LightGBM": {
                     "model": Categorical([model]),
-                    "model__class_weight": Categorical(categories=['balanced', None]),
+                    "model__is_unbalance": Categorical(categories=[True, False]),
                     "model__learning_rate": Real(0.01, 1.0),
                     "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
                     "model__n_estimators": Integer(10, 500),
+                    "model__max_bin":Integer(100,10000)
                     "model__min_samples_split": Integer(2, 10),
-                    "model__min_samples_leaf": Integer(1, 10),
-                    "model__min_child_weight": Integer(0, 50)
+                    "model__feature_fraction": Real(0,5,1),
+                    "model__bagging_fraction":Real(0,5,1),
+                    "model__bagging_freq":Integer(0,01,1),
+                    "model__reg_alpha":Real(1e-9, 1000, 'log-uniform'),
+                    "model__reg_lambda":Real(1e-9, 1000, 'log-uniform'),
                 },
                 "RandomForest": {
                     "model": Categorical([model]),
