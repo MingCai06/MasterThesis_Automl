@@ -1,5 +1,5 @@
 # Importing core libraries
-from time import time
+import time
 import pprint
 import joblib
 
@@ -26,7 +26,7 @@ from skopt.callbacks import VerboseCallback  # Callback to control the verbosity
 from skopt.callbacks import DeltaXStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
 
 # import local function
-from util import log, timeit, mprint, write_result
+from util import log, timeit, mprint, dump_result, load_result
 from encoder import Categorical_encoder
 from scaling import Scaler
 from model import Classifier
@@ -140,7 +140,7 @@ class Optimiser():
                 setattr(self, k, v)
 
     @timeit
-    def optimise_step(self, space, df_train, df_target, max_evals=20, set_callbacks=True):
+    def optimise_step(self, space, df_train, df_target, max_evals=20, npoints=4, set_callbacks=True):
         """Evaluates the data.
         Build the pipeline. If no parameters are set, default configuration for
         each step is used
@@ -250,9 +250,8 @@ class Optimiser():
                                             search_spaces=search_spaces,
                                             scoring=self.scoring,
                                             cv=self.cv,
-                                            n_points=10,
+                                            n_points=npoints,
                                             n_jobs=-1,
-                                            #          n_iter=max_evals,
                                             return_train_score=False,
                                             optimizer_kwargs={'base_estimator': baseEstimator,
                                                               "acq_func": "EI"},
@@ -263,7 +262,7 @@ class Optimiser():
                                             search_spaces=search_spaces,
                                             scoring=self.scoring,
                                             cv=self.cv,
-                                            n_points=10,
+                                            n_points=npoints,
                                             n_jobs=1,
                                             #         n_iter=max_evals,
                                             return_train_score=False,
@@ -274,23 +273,28 @@ class Optimiser():
 
                     if set_callbacks is True:
 
-                        mid_result = self.report_perf(opt, X, df_target, ' with baseEstimator:' + baseEstimator,
-                                                      callbacks=[DeltaXStopper(0.0001)
-                                                                 #, DeadlineStopper(60 * 5)
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
+                                                      callbacks=[DeltaXStopper(0.0001), DeadlineStopper(60 * 5)
                                                                  ])
                     else:
-                        mid_result = self.report_perf(opt, X, df_target, ' with baseEstimator: ' + baseEstimator,
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,
                                                       )
                     tuning_result[baseEstimator] = mid_result
 
+        bests = pd.DataFrame()
         for key in tuning_result.keys():
             if tuning_result[key]['best_score'] == max(d['best_score'] for d in tuning_result.values()):
-                best_base_estimator = key
+                bests = bests.append({'best_score': tuning_result[key]['best_score'],
+                                      'best_SM': key,
+                                      'time': tuning_result[key]['CPU_Time']}, ignore_index=True)
+                bests.sort_values(by=['time'])
+                best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
+
         print("")
         print('######## Congratulations! Here is the Best Parameters: #######')
         print('Best Score is:', tuning_result[best_base_estimator]['best_score'])
-        print(pipe.get_params()['model'].__class__.__name__ + ' with baseEstimator ' + best_base_estimator)
+        print('with Surrogate Model ' + best_base_estimator)
         pprint.pprint(best_param)
         return best_param, tuning_result
 
@@ -310,7 +314,8 @@ class Optimiser():
         y = our target
         title = a string label for the experiment
         """
-        start = time()
+        start = time.time()
+        start_cpu = time.process_time()
         if callbacks:
             mprint(f'start tuning {title}...')
 
@@ -320,24 +325,25 @@ class Optimiser():
 
             optimizer.fit(X, y)
 
-        time_cost = time() - start
+        time_cost_CPU = time.process_time() - start_cpu
+        time_cost = time.time() - start
         result = {}
         result['best_score'] = optimizer.best_score_
         result['best_score_std'] = optimizer.cv_results_['std_test_score'][optimizer.best_index_]
         result['best_parmas'] = optimizer.best_params_
         result['params'] = optimizer.cv_results_['params']
-        result['time_cost(s)'] = round(time_cost, 0)
+        result['CPU_Time'] = round(time_cost_CPU, 0)
+        result['Time_cost'] = round(time_cost, 0)
         result['all_cv_results'] = optimizer.cv_results_['mean_test_score'][:]
-        result['mean_score_time'] = optimizer.cv_results_['mean_score_time'][:]
-        result['mean_score_time'] = optimizer.cv_results_['mean_score_time'][:]
         result['CV'] = optimizer.cv_results_
         print("")
-        print('>' + title + ':')
-        time_cost = round(result['time_cost(s)'], 0)
+#        print('>' + title + ':')
+        time_cost_CPU = round(result['CPU_Time'], 0)
+        time_cost = round(result['Time_cost'], 0)
         cand = len(result['all_cv_results'])
-        best_cv = round(result['best_score'], 4)
+        best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
-        print(f'took{time_cost}s, candidates checked:{cand},best CV score: {best_cv} \u00B1 {best_cv_sd}')
+        print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
         return result
