@@ -74,62 +74,83 @@ def mprint(msg):
     print(f"INFO  [{cur_time}] {msg}")
 
 
-# wirte result
-def init_dirs():
+# # wirte result
+# def init_dirs():
 
-    if len(sys.argv) == 1:
-        # default local
-        root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
-        dirs = {
-            'data': join(root_dir, 'data'),
-            'output': join(root_dir, 'result_output'),
-            'prediction': join(root_dir, 'predictions')
-        }
+#     if len(sys.argv) == 1:
+#         # default local
+#         root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
+#         dirs = {
+#             'data': join(root_dir, 'data'),
+#             'output': join(root_dir, 'result_output'),
+#             'prediction': join(root_dir, 'predictions')
+#         }
 
-    elif len(sys.argv) == 3:
-        # default local
-        root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
-        dirs = {
-            'data': join(root_dir, 'data'),
-            'output': join(root_dir, 'result_output'),
-            'prediction': join(root_dir, 'predictions')
-        }
+#     elif len(sys.argv) == 3:
+#         # default local
+#         root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
+#         dirs = {
+#             'data': join(root_dir, 'data'),
+#             'output': join(root_dir, 'result_output'),
+#             'prediction': join(root_dir, 'predictions')
+#         }
 
-    elif len(sys.argv) == 3:
-        # codalab
-        dirs = {
-            'data': join(sys.argv[1], 'data'),
-            'output': sys.argv[2],
-            'prediction': join(sys.argv[1], 'res')
-        }
+#     elif len(sys.argv) == 3:
+#         # codalab
+#         dirs = {
+#             'data': join(sys.argv[1], 'data'),
+#             'output': sys.argv[2],
+#             'prediction': join(sys.argv[1], 'res')
+#         }
 
-    elif len(sys.argv) == 5 and sys.argv[1] == 'local':
-        # full call in local
-        dirs = {
-            'prediction': join(sys.argv[2]),
-            'ref': join(sys.argv[3]),
-            'output': sys.argv[4]
-        }
-    else:
-        raise ValueError("Wrong number of arguments")
+#     elif len(sys.argv) == 5 and sys.argv[1] == 'local':
+#         # full call in local
+#         dirs = {
+#             'prediction': join(sys.argv[2]),
+#             'ref': join(sys.argv[3]),
+#             'output': sys.argv[4]
+#         }
+#     else:
+#         raise ValueError("Wrong number of arguments")
 
-    os.makedirs(dirs['output'], exist_ok=True)
-    return dirs
+#     os.makedirs(dirs['output'], exist_ok=True)
+#     return dirs
 
 
 def dump_result(data, custom_name=None, save_with_time=False):
-    dirs = init_dirs()
-    path = join(dirs['output'])
-    datanames = sorted(os.listdir(dirs['data']))[0].split(".")[0]
+    if len(sys.argv) == 3:
+        # default local
+        ROOT_DIR = os.getcwd()
+        DIRS = {
+            'input': join(ROOT_DIR, 'data'),
+            'output': join(ROOT_DIR, 'result_output'),
+        }
+    path = DIRS['output']
+    datanames = listdirInMac(DIRS['input'])[0].split(".")[0]
     timestr = time.strftime("%Y%m%d%H%M%S")
     if save_with_time is True:
-        filename = datanames + custom_name + timestr + '.json'
+        filename = datanames + '_' + custom_name + '_' + timestr + '.json'
     else:
-        filename = datanames + custom_name + '.json'
+        filename = datanames + '_' + custom_name + '.json'
     dump(data, (path + '/' + filename))
+    print("Dump successful! File Name:", filename)
 
 
 def load_result(filename):
-    dirs = init_dirs()
-    path = join(dirs['output'])
+    if len(sys.argv) == 3:
+        # default local
+        ROOT_DIR = os.getcwd()
+        DIRS = {
+            'input': join(ROOT_DIR, 'data'),
+            'output': join(ROOT_DIR, 'result_output'),
+        }
+    path = DIRS['output']
     return load(path + '/' + filename)
+
+
+def listdirInMac(path):
+    os_list = os.listdir(path)
+    for item in os_list:
+        if item.startswith('.') and os.path.isfile(os.path.join(path, item)):
+            os_list.remove(item)
+    return os_list
