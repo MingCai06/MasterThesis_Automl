@@ -2,6 +2,7 @@
 import time
 import pprint
 import joblib
+import pandas as pd
 
 # Suppressing warnings because of skopt verbosity
 import warnings
