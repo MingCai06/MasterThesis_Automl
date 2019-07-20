@@ -352,11 +352,8 @@ class Classifier():
                     "model__learning_rate": Real(0.01, 1.0),
                     "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
                     "model__n_estimators": Integer(10, 500),
-                    "model__max_bin":Integer(100,10000)
-                    "model__min_samples_split": Integer(2, 10),
-                    "model__feature_fraction": Real(0,5,1),
-                    "model__bagging_fraction":Real(0,5,1),
-                    "model__bagging_freq":Integer(0,01,1),
+                    "model__max_bin":Integer(100,10000),
+                    "model__feature_fraction": Real(0.01, 1.0, 'uniform'),
                     "model__reg_alpha":Real(1e-9, 1000, 'log-uniform'),
                     "model__reg_lambda":Real(1e-9, 1000, 'log-uniform'),
                 },
