@@ -102,7 +102,7 @@ class RandomOptimiser():
             rs = RandomizedSearchCV(model, params, cv=self.n_folds, n_jobs=n_jobs, n_iter=n_iter,
                                     verbose=verbose, scoring=self.scoring, refit=True,
                                     return_train_score=True)
-            rs.fit(X, y)
+            rs.fit(X, df_target)
             self.random_searches[key] = rs
             self.time_cost_CPU = time.process_time() - start_cpu
             time_cost = time.time() - start
