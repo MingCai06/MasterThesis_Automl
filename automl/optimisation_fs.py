@@ -268,7 +268,7 @@ class Optimiser():
                                             #         n_iter=max_evals,
                                             return_train_score=False,
                                             optimizer_kwargs={'base_estimator': baseEstimator,
-                                                              "acq_func": "EI"},
+                                                              "acq_func": "EIps"},
                                             random_state=self.random_state,
                                             verbose=self.verbose)
 
@@ -344,7 +344,7 @@ class Optimiser():
         cand = len(result['all_cv_results'])
         best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
-        print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
+        print(f'took CPU Time: {time_cost_CPU}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
         return result
