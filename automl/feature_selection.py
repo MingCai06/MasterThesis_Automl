@@ -49,7 +49,7 @@ class feature_selector():
             else:
                 setattr(self, k, v)
 
-    def fit(self, df_train, y_train):
+    def fit(self, df_train: pd.DataFrame, y_train: pd.Series):
         """Fits Clf_feature_selector
         Parameters
         ----------
@@ -64,9 +64,10 @@ class feature_selector():
         """
 
         # sanity checks
-        if((type(df_train) != pd.SparseDataFrame) and
-           (type(df_train) != pd.DataFrame)):
-            raise ValueError("df_train must be a DataFrame")
+        # if((type(df_train) != pd.SparseDataFrame) and
+        #    (type(df_train) != pd.DataFrame) and
+        #    (type(df_train) != pd.core.frame.DataFrame)):
+        #     raise ValueError("df_train must be a DataFrame")
 
         if (type(y_train) != pd.core.series.Series):
             raise ValueError("y_train must be a Series")
