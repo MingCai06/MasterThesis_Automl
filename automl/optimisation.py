@@ -242,7 +242,7 @@ search_space_LGB = Classifier(strategy = "LightGBM").get_search_spaces()
                                                                  #, DeadlineStopper(60 * 5)
                                                                  ])
                     else:
-                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,
+                        mid_result = self.report_perf(opt, X, df_target, ' with baseEstimator: ' + baseEstimator,
                                                       )
                     tuning_result[baseEstimator] = mid_result
 
