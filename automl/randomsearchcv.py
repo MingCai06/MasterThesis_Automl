@@ -3,7 +3,7 @@ import time
 import pprint
 import joblib
 import pandas as pd
-
+import numpy as np
 # Suppressing warnings because of skopt verbosity
 import warnings
 warnings.filterwarnings("ignore")
