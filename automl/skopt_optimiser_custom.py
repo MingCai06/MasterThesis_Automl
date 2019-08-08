@@ -270,7 +270,7 @@ class Optimizer(object):
 
         return optimizer
 
-    def ask(self, n_points=None, strategy="cl_min"):
+    def ask(self, n_points=None, nrandom=1, strategy="cl_min"):
         """Query point or multiple points at which objective should be evaluated.
         * `n_points` [int or None, default=None]:
             Number of points returned by the ask method.
@@ -300,9 +300,9 @@ class Optimizer(object):
 
         supported_strategies = ["cl_min", "cl_mean", "cl_max"]
 
-        if not (isinstance(n_points, int) and n_points > 1):
+        if not (isinstance(n_points, int) and n_points - nrandom > 0):
             raise ValueError(
-                "n_points should be int > 2, got " + str(n_points)
+                "n_points should be int > nrandom, got " + str(n_points)
             )
 
         if strategy not in supported_strategies:
@@ -322,7 +322,7 @@ class Optimizer(object):
         opt = self.copy(random_state=self.rng.randint(0, np.iinfo(np.int32).max))
 
         X = []
-        for i in range(n_points - 1):
+        for i in range(n_points - nrandom):
             x = opt.ask()
             X.append(x)
 
@@ -346,8 +346,9 @@ class Optimizer(object):
                 opt._tell(x, (y_lie, t_lie))
             else:
                 opt._tell(x, y_lie)
-        x_random = opt.ask()
-        X.append(x_random)
+        for j in range(nrandom):
+            x_random = opt._ask()
+            X.append(x_random)
         self.cache_ = {(n_points, strategy): X}  # cache_ the result
 
         return X
