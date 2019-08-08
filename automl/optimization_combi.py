@@ -1,7 +1,8 @@
 # Importing core libraries
-from time import time
+import time
 import pprint
 import joblib
+import pandas as pd
 
 # Suppressing warnings because of skopt verbosity
 import warnings
@@ -18,6 +19,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import make_scorer
 
 # Skopt functions
+#from skopt import BayesSearchCV
 from skopt.space import Real, Categorical, Integer
 from skopt.utils import use_named_args  # decorator to convert a list of parameters to named arguments
 from skopt.callbacks import DeadlineStopper  # Stop the optimization before running out of a fixed budget of time.
@@ -25,12 +27,12 @@ from skopt.callbacks import VerboseCallback  # Callback to control the verbosity
 from skopt.callbacks import DeltaXStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
 
 # import local function
+from bayessearch_custom import BayesSearchCV
 from util import log, timeit, mprint, dump_result, load_result
 from encoder import Categorical_encoder
 from scaling import Scaler
 from model import Classifier
 from feature_selection import feature_selector
-from bayessearch_custom import BayesSearchCV
 
 
 class automl_Optimiser():
@@ -140,7 +142,7 @@ class automl_Optimiser():
                 setattr(self, k, v)
 
     @timeit
-    def optimise_step(self, space, df_train, df_target, max_evals=20, npoints=4, set_callbacks=True):
+    def optimise_step(self, space, df_train, df_target, max_evals=20, npoints=4, nrandom=1, set_callbacks=True):
         """Evaluates the data.
         Build the pipeline. If no parameters are set, default configuration for
         each step is used
@@ -177,7 +179,9 @@ class automl_Optimiser():
 
         mid_result = {}
         tuning_result = {}
-        tuning_clf_result = {}
+
+#        lgb = Classifier(strategy="LightGBM").get_estimator()
+#        rf = Classifier(strategy="RandomForest").get_estimator()
 
         # Creating a correct space for skopt
         if (space is None):
@@ -226,55 +230,70 @@ class automl_Optimiser():
                     print("")
 
                 for baseEstimator in ['GP', 'RF']:
-                  #  lgb = Classifier(strategy="LightGBM").get_estimator()
+                    # Pipeline creation
+
+                    lgb = Classifier(strategy="LightGBM").get_estimator()
                   #  rf = Classifier(strategy="RandomForest").get_estimator()
                   #  svc = Classifier(strategy="SVC").get_estimator()
 
-                    for classifier in ['LightGBM', 'SVM']:
-                        clf = Classifier(strategy=classifier).get_estimator()
-
-                        if (self.parallel_strategy is True):
-                            opt = BayesSearchCV(clf,
-                                                search_spaces=search_spaces,
-                                                scoring=self.scoring,
-                                                cv=self.cv,
-                                                n_points=npoints,
-                                                n_jobs=-1,
-                                                n_iter=max_evals,
-                                                return_train_score=False,
-                                                optimizer_kwargs={'base_estimator': baseEstimator,
-                                                                  "acq_func": "EI"},
-                                                random_state=self.random_state,
-                                                verbose=self.verbose)
+                    if (fs is not None):
+                        if cache:
+                            pipe = Pipeline([('fs', fs), ('model', lgb)], memory=self.to_path)
                         else:
-                            opt = BayesSearchCV(clf,
-                                                search_spaces=search_spaces,
-                                                scoring=self.scoring,
-                                                cv=self.cv,
-                                                n_points=npoints,
-                                                n_jobs=1,
-                                                n_iter=max_evals,
-                                                return_train_score=False,
-                                                optimizer_kwargs={'base_estimator': baseEstimator,
-                                                                  "acq_func": "EI"},
-                                                random_state=self.random_state,
-                                                verbose=self.verbose)
-
-                        if set_callbacks is True:
-
-                            mid_result = self.report_perf(opt, X, df_target, 'staring tuning' + classifier + ' with Surrogate Model:' + baseEstimator,
-                                                          callbacks=[DeltaXStopper(0.0001), DeadlineStopper(60 * 10)
-                                                                     ])
+                            pipe = Pipeline([('fs', fs), ('model', lgb)])
+                    else:
+                        if cache:
+                            pipe = Pipeline([('model', lgb)], memory=self.to_path)
                         else:
-                            mid_result = self.report_perf(opt, X, df_target, 'staring tuning' + classifier + ' with Surrogate Model: ' + baseEstimator)
+                            pipe = Pipeline([('model', lgb)])
 
-                        tuning_clf_result[clf] = mid_result
-                    tuning_result[baseEstimator] = tuning_clf_result
+                    if (self.parallel_strategy is True):
+                        opt = BayesSearchCV(pipe,
+                                            search_spaces=search_spaces,
+                                            scoring=self.scoring,
+                                            cv=self.cv,
+                                            n_points=npoints,
+                                            n_jobs=-1,
+                                            nrandom=nrandom,
+                                            return_train_score=False,
+                                            optimizer_kwargs={'base_estimator': baseEstimator,
+                                                              "acq_func": "EI"},
+                                            random_state=self.random_state,
+                                            verbose=self.verbose)
+                    else:
+                        opt = BayesSearchCV(pipe,
+                                            search_spaces=search_spaces,
+                                            scoring=self.scoring,
+                                            cv=self.cv,
+                                            n_points=npoints,
+                                            n_jobs=1,
+                                            nrandom=nrandom,
+                                            return_train_score=False,
+                                            optimizer_kwargs={'base_estimator': baseEstimator,
+                                                              "acq_func": "EI"},
+                                            random_state=self.random_state,
+                                            verbose=self.verbose)
 
+                    if set_callbacks is True:
+
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
+                                                      callbacks=[DeltaXStopper(0.0001), DeadlineStopper(60 * 5)
+                                                                 ])
+                    else:
+                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,
+                                                      )
+                    tuning_result[baseEstimator] = mid_result
+
+        bests = pd.DataFrame()
         for key in tuning_result.keys():
             if tuning_result[key]['best_score'] == max(d['best_score'] for d in tuning_result.values()):
-                best_base_estimator = key
+                bests = bests.append({'best_score': tuning_result[key]['best_score'],
+                                      'best_SM': key,
+                                      'time': tuning_result[key]['CPU_Time']}, ignore_index=True)
+                bests.sort_values(by=['time'])
+                best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
+
         print("")
         print('######## Congratulations! Here is the Best Parameters: #######')
         print('Best Score is:', tuning_result[best_base_estimator]['best_score'])
@@ -298,7 +317,8 @@ class automl_Optimiser():
         y = our target
         title = a string label for the experiment
         """
-        start = time()
+        start = time.time()
+        start_cpu = time.process_time()
         if callbacks:
             mprint(f'start tuning {title}...')
 
@@ -308,24 +328,25 @@ class automl_Optimiser():
 
             optimizer.fit(X, y)
 
-        time_cost = time() - start
+        time_cost_CPU = time.process_time() - start_cpu
+        time_cost = time.time() - start
         result = {}
         result['best_score'] = optimizer.best_score_
         result['best_score_std'] = optimizer.cv_results_['std_test_score'][optimizer.best_index_]
         result['best_parmas'] = optimizer.best_params_
         result['params'] = optimizer.cv_results_['params']
-        result['time_cost(s)'] = round(time_cost, 0)
+        result['CPU_Time'] = round(time_cost_CPU, 0)
+        result['Time_cost'] = round(time_cost, 0)
         result['all_cv_results'] = optimizer.cv_results_['mean_test_score'][:]
-        result['mean_score_time'] = optimizer.cv_results_['mean_score_time'][:]
-        result['mean_score_time'] = optimizer.cv_results_['mean_score_time'][:]
         result['CV'] = optimizer.cv_results_
         print("")
-        print('>' + title + ':')
-        time_cost = round(result['time_cost(s)'], 0)
+#        print('>' + title + ':')
+        time_cost_CPU = round(result['CPU_Time'], 0)
+        time_cost = round(result['Time_cost'], 0)
         cand = len(result['all_cv_results'])
-        best_cv = round(result['best_score'], 4)
+        best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
-        print(f'took{time_cost}s, candidates checked:{cand},best CV score: {best_cv} \u00B1 {best_cv_sd}')
+        print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
         return result
