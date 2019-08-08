@@ -101,7 +101,7 @@ class RandomOptimiser():
             params = self.params[key]
             rs = RandomizedSearchCV(model, params, cv=self.n_folds, n_jobs=n_jobs, n_iter=n_iter,
                                     verbose=verbose, scoring=self.scoring, refit=True,
-                                    return_train_score=True)
+                                    random_state=self.random_state, return_train_score=False)
             rs.fit(X, df_target)
             self.random_searches[key] = rs
             self.time_cost_CPU = time.process_time() - start_cpu
@@ -121,7 +121,7 @@ class RandomOptimiser():
             cand = len(result['all_cv_results'])
             best_cv = round(result['best_score'], 8)
             best_cv_sd = round(result['best_score_std'], 4)
-            print(f'took CPU Time: {time_cost_CPU}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
+            print(f'took CPU Time: {time_cost_CPU}s,clock time{time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
             print("")
             tuning_result[key] = result
         return tuning_result
