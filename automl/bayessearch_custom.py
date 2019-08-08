@@ -13,10 +13,12 @@ from sklearn.utils.fixes import MaskedArray
 from sklearn.utils.validation import indexable, check_is_fitted
 from sklearn.metrics.scorer import check_scoring
 
-from skopt_optimiser_custom import Optimizer
+#from skopt import Optimizer
 from skopt.utils import point_asdict, dimensions_aslist, eval_callbacks
 from skopt.space import check_dimension
 from skopt.callbacks import check_callback
+
+from skopt_optimiser_custom import Optimizer
 
 
 class BayesSearchCV(BaseSearchCV):
@@ -229,13 +231,14 @@ class BayesSearchCV(BaseSearchCV):
 
     def __init__(self, estimator, search_spaces, optimizer_kwargs=None,
                  n_iter=50, scoring=None, fit_params=None, n_jobs=1,
-                 n_points=1, iid=True, refit=True, cv=None, verbose=0,
+                 n_points=1, nrandom=2, iid=True, refit=True, cv=None, verbose=0,
                  pre_dispatch='2*n_jobs', random_state=None,
                  error_score='raise', return_train_score=False):
 
         self.search_spaces = search_spaces
         self.n_iter = n_iter
         self.n_points = n_points
+        self.nrandom = nrandom
         self.random_state = random_state
         self.optimizer_kwargs = optimizer_kwargs
         self._check_search_space(self.search_spaces)
@@ -482,7 +485,7 @@ class BayesSearchCV(BaseSearchCV):
         """
 
         # get parameter values to evaluate
-        params = optimizer.ask(n_points=n_points)
+        params = optimizer.ask(n_points=n_points, nrandom=self.nrandom)
 
         # convert parameters to python native types
         params = [[np.asscalar(np.array(v)) for v in p] for p in params]
