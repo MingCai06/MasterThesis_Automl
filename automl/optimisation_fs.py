@@ -83,7 +83,6 @@ class Optimiser():
                  random_state=42,
                  verbose=True,
                  to_path="save",
-                 perform_scaling=True,
                  parallel_strategy=True):
 
         self.scoring = scoring
@@ -91,8 +90,8 @@ class Optimiser():
         self.random_state = random_state
         self.verbose = verbose
         self.to_path = to_path
-        self.perform_scaling = perform_scaling
         self.parallel_strategy = parallel_strategy
+        self.perform_scaling = False
 
         if self.to_path is True:
             warnings.warn("Optimiser will save all your fitted models result ")
@@ -125,7 +124,6 @@ class Optimiser():
                 'random_state': self.random_state,
                 'verbose': self.verbose,
                 'save_result': self.save_result,
-                'perform_scaling': self.perform_scaling,
                 'parallel_strategy': self.parallel_strategy}
 
     def set_params(self, **params):
@@ -172,9 +170,12 @@ class Optimiser():
         ce = Categorical_encoder()
         X = ce.fit_transform(df_train, df_target)
 
-        if self.perform_scaling is True:
+        if len(df_train.dtypes[df_train.dtypes == 'float'].index) != 0:
             scal = Scaler()
             X = scal.fit_transform(X, df_target)
+            self.perform_scaling is True
+        else:
+            pass
 
         mid_result = {}
         tuning_result = {}
@@ -232,8 +233,6 @@ class Optimiser():
                     # Pipeline creation
 
                     lgb = Classifier(strategy="LightGBM").get_estimator()
-                  #  rf = Classifier(strategy="RandomForest").get_estimator()
-                  #  svc = Classifier(strategy="SVC").get_estimator()
 
                     if (fs is not None):
                         if cache:
@@ -265,7 +264,6 @@ class Optimiser():
                                             cv=self.cv,
                                             n_points=npoints,
                                             n_jobs=1,
-                                            #         n_iter=max_evals,
                                             return_train_score=False,
                                             optimizer_kwargs={'base_estimator': baseEstimator,
                                                               "acq_func": "EIps"},
@@ -273,7 +271,6 @@ class Optimiser():
                                             verbose=self.verbose)
 
                     if set_callbacks is True:
-
                         mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
                                                       callbacks=[DeltaXStopper(0.0001), DeadlineStopper(60 * 5)
                                                                  ])
@@ -344,7 +341,7 @@ class Optimiser():
         cand = len(result['all_cv_results'])
         best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
-        print(f'took CPU Time: {time_cost_CPU}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
+        print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
         return result
