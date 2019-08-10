@@ -89,9 +89,12 @@ class RandomOptimiser():
         ce = Categorical_encoder()
         X = ce.fit_transform(df_train, df_target)
 
-        if self.perform_scaling is True:
+        if len(df_train.dtypes[df_train.dtypes == 'float'].index) != 0:
             scal = Scaler()
             X = scal.fit_transform(X, df_target)
+            self.perform_scaling is True
+        else:
+            pass
 
         for key in self.keys:
             print("Running RandomSearchCV for %s." % key)
@@ -102,6 +105,7 @@ class RandomOptimiser():
             rs = RandomizedSearchCV(model, params, cv=self.n_folds, n_jobs=n_jobs, n_iter=n_iter,
                                     verbose=verbose, scoring=self.scoring, refit=True,
                                     random_state=self.random_state, return_train_score=False)
+            mprint("Start random search cv fitting......")
             rs.fit(X, df_target)
             self.random_searches[key] = rs
             self.time_cost_CPU = time.process_time() - start_cpu

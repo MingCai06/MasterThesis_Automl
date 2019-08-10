@@ -92,7 +92,7 @@ class automl_Optimiser():
         self.random_state = random_state
         self.verbose = verbose
         self.to_path = to_path
-        self.perform_scaling = perform_scaling
+        self.perform_scaling = False
         self.parallel_strategy = parallel_strategy
 
         if self.to_path is True:
@@ -173,9 +173,12 @@ class automl_Optimiser():
         ce = Categorical_encoder()
         X = ce.fit_transform(df_train, df_target)
 
-        if self.perform_scaling is True:
+        if len(df_train.dtypes[df_train.dtypes == 'float'].index) != 0:
             scal = Scaler()
             X = scal.fit_transform(X, df_target)
+            self.perform_scaling is True
+        else:
+            pass
 
         mid_result = {}
         tuning_result = {}

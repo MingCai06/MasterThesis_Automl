@@ -83,7 +83,8 @@ class Optimiser():
                  random_state=42,
                  verbose=True,
                  to_path="save",
-                 parallel_strategy=True):
+                 parallel_strategy=True,
+                 baseEstimator=["GP","RF"]):
 
         self.scoring = scoring
         self.n_folds = n_folds
@@ -92,6 +93,7 @@ class Optimiser():
         self.to_path = to_path
         self.parallel_strategy = parallel_strategy
         self.perform_scaling = False
+        self.baseEstimator = baseEstimator
 
         if self.to_path is True:
             warnings.warn("Optimiser will save all your fitted models result ")
@@ -229,7 +231,7 @@ class Optimiser():
                     print(">>> Numerical Features have encoded with :" + scal.__class__.__name__)
                     print("")
 
-                for baseEstimator in ['GP', 'RF']:
+                for baseEstimator in self.baseEstimator:
                     # Pipeline creation
 
                     lgb = Classifier(strategy="LightGBM").get_estimator()
@@ -266,7 +268,7 @@ class Optimiser():
                                             n_jobs=1,
                                             return_train_score=False,
                                             optimizer_kwargs={'base_estimator': baseEstimator,
-                                                              "acq_func": "EIps"},
+                                                              "acq_func": "EI"},
                                             random_state=self.random_state,
                                             verbose=self.verbose)
 
