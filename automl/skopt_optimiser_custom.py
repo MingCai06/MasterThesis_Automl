@@ -300,9 +300,9 @@ class Optimizer(object):
 
         supported_strategies = ["cl_min", "cl_mean", "cl_max"]
 
-        if not (isinstance(n_points, int) and n_points - nrandom > 0):
+        if not (isinstance(n_points, int) and n_points > 0):
             raise ValueError(
-                "n_points should be int > nrandom, got " + str(n_points)
+                "n_points should be int > 1, got " + str(n_points)
             )
 
         if strategy not in supported_strategies:
@@ -322,33 +322,64 @@ class Optimizer(object):
         opt = self.copy(random_state=self.rng.randint(0, np.iinfo(np.int32).max))
 
         X = []
-        for i in range(n_points - nrandom):
-            x = opt.ask()
-            X.append(x)
+        if n_points > nrandom:
+            for i in range(n_points - nrandom):
+                x = opt.ask()
+                X.append(x)
+    #            print(f'1step Selected {len(X)} points')
 
-            ti_available = "ps" in self.acq_func and len(opt.yi) > 0
-            ti = [t for (_, t) in opt.yi] if ti_available else None
+                ti_available = "ps" in self.acq_func and len(opt.yi) > 0
+                ti = [t for (_, t) in opt.yi] if ti_available else None
 
-            if strategy == "cl_min":
-                y_lie = np.min(opt.yi) if opt.yi else 0.0  # CL-min lie
-                t_lie = np.min(ti) if ti is not None else log(sys.float_info.max)
-            elif strategy == "cl_mean":
-                y_lie = np.mean(opt.yi) if opt.yi else 0.0  # CL-mean lie
-                t_lie = np.mean(ti) if ti is not None else log(sys.float_info.max)
-            else:
-                y_lie = np.max(opt.yi) if opt.yi else 0.0  # CL-max lie
-                t_lie = np.max(ti) if ti is not None else log(sys.float_info.max)
+                if strategy == "cl_min":
+                    y_lie = np.min(opt.yi) if opt.yi else 0.0  # CL-min lie
+                    t_lie = np.min(ti) if ti is not None else log(sys.float_info.max)
+                elif strategy == "cl_mean":
+                    y_lie = np.mean(opt.yi) if opt.yi else 0.0  # CL-mean lie
+                    t_lie = np.mean(ti) if ti is not None else log(sys.float_info.max)
+                else:
+                    y_lie = np.max(opt.yi) if opt.yi else 0.0  # CL-max lie
+                    t_lie = np.max(ti) if ti is not None else log(sys.float_info.max)
 
-            # Lie to the optimizer.
-            if "ps" in self.acq_func:
-                # Use `_tell()` instead of `tell()` to prevent repeated
-                # log transformations of the computation times.
-                opt._tell(x, (y_lie, t_lie))
-            else:
-                opt._tell(x, y_lie)
-        for j in range(nrandom):
-            x_random = opt._ask()
-            X.append(x_random)
+                # Lie to the optimizer.
+                if "ps" in self.acq_func:
+                    # Use `_tell()` instead of `tell()` to prevent repeated
+                    # log transformations of the computation times.
+                    opt._tell(x, (y_lie, t_lie))
+                else:
+                    opt._tell(x, y_lie)
+                print(f'Selected {len(X)} evaluated points')
+            for j in range(nrandom):
+                x_random = opt.ask()
+                X.append(x_random)
+            print(f'Selected {len(X)} points')
+
+        else:
+            for i in range(n_points):
+                x = opt.ask()
+                X.append(x)
+
+                ti_available = "ps" in self.acq_func and len(opt.yi) > 0
+                ti = [t for (_, t) in opt.yi] if ti_available else None
+
+                if strategy == "cl_min":
+                    y_lie = np.min(opt.yi) if opt.yi else 0.0  # CL-min lie
+                    t_lie = np.min(ti) if ti is not None else log(sys.float_info.max)
+                elif strategy == "cl_mean":
+                    y_lie = np.mean(opt.yi) if opt.yi else 0.0  # CL-mean lie
+                    t_lie = np.mean(ti) if ti is not None else log(sys.float_info.max)
+                else:
+                    y_lie = np.max(opt.yi) if opt.yi else 0.0  # CL-max lie
+                    t_lie = np.max(ti) if ti is not None else log(sys.float_info.max)
+
+                # Lie to the optimizer.
+                if "ps" in self.acq_func:
+                    # Use `_tell()` instead of `tell()` to prevent repeated
+                    # log transformations of the computation times.
+                    opt._tell(x, (y_lie, t_lie))
+                else:
+                    opt._tell(x, y_lie)
+            print(f'Selected {len(X)} points')
         self.cache_ = {(n_points, strategy): X}  # cache_ the result
 
         return X
