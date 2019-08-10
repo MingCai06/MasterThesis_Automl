@@ -53,7 +53,7 @@ class Classifier():
             params = {
                 "objective": "binary",
                 "verbosity": 1,
-                "seed": 0
+                "random_state": 42
             }
             params["strategy"] = self.__strategy
             params.update(self.__classif_params)
@@ -100,12 +100,13 @@ class Classifier():
         self.__strategy = strategy
 
         if(strategy == "LightGBM"):
-            self.__classifier = LGBMClassifier(objective="binary", nthread=-1, seed=0)
+            self.__classifier = LGBMClassifier(objective="binary",  random_state=42)
 
         elif (strategy == "RandomForest"):
             self.__classifier = RandomForestClassifier(random_state=0)
 
         elif (strategy == "SVC"):
+            
             self.__classifier = SVC(max_iter=1000,random_state=0)
         # Here can add other classfier
         # elif(self.strategy =="")
