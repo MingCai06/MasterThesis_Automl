@@ -348,11 +348,11 @@ class Optimizer(object):
                     opt._tell(x, (y_lie, t_lie))
                 else:
                     opt._tell(x, y_lie)
-                print(f'Selected {len(X)} evaluated points')
+                #print(f'Selected {len(X)} evaluated points')
             for j in range(nrandom):
                 x_random = opt.ask()
                 X.append(x_random)
-            print(f'Selected {len(X)} points')
+            #print(f'Selected {len(X)} points')
 
         else:
             for i in range(n_points):
@@ -379,7 +379,7 @@ class Optimizer(object):
                     opt._tell(x, (y_lie, t_lie))
                 else:
                     opt._tell(x, y_lie)
-            print(f'Selected {len(X)} points')
+            #print(f'Selected {len(X)} points')
         self.cache_ = {(n_points, strategy): X}  # cache_ the result
 
         return X
