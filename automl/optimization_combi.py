@@ -24,7 +24,7 @@ from skopt.space import Real, Categorical, Integer
 from skopt.utils import use_named_args  # decorator to convert a list of parameters to named arguments
 from skopt.callbacks import DeadlineStopper  # Stop the optimization before running out of a fixed budget of time.
 from skopt.callbacks import VerboseCallback  # Callback to control the verbosity
-from skopt.callbacks import DeltaXStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
+from skopt.callbacks import DeltaYStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
 
 # import local function
 from bayessearch_custom import BayesSearchCV
@@ -280,7 +280,7 @@ class automl_Optimiser():
                     if set_callbacks is True:
 
                         mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
-                                                      callbacks=[DeltaXStopper(0.0001), DeadlineStopper(60 * 5)
+                                                      callbacks=[DeltaYStopper(0.0001), DeadlineStopper(60 * 5)
                                                                  ])
                     else:
                         mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,

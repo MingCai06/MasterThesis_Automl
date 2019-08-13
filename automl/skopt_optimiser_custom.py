@@ -270,7 +270,7 @@ class Optimizer(object):
 
         return optimizer
 
-    def ask(self, n_points=None, nrandom=1, strategy="cl_min"):
+    def ask(self, n_points=None, nrandom=2, strategy="cl_min"):
         """Query point or multiple points at which objective should be evaluated.
         * `n_points` [int or None, default=None]:
             Number of points returned by the ask method.

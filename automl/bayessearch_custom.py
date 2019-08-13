@@ -606,6 +606,7 @@ class BayesSearchCV(BaseSearchCV):
                 n_iter -= n_points
 
                 if eval_callbacks(callbacks, optim_result):
+                    print('check call back:', eval_callbacks(callbacks, optim_result))
                     break
 
         # Refit the best model on the the whole dataset
