@@ -292,8 +292,8 @@ class automl_Optimiser():
             if tuning_result[key]['best_score'] == max(d['best_score'] for d in tuning_result.values()):
                 bests = bests.append({'best_score': tuning_result[key]['best_score'],
                                       'best_SM': key,
-                                      'time': tuning_result[key]['CPU_Time']}, ignore_index=True)
-                bests.sort_values(by=['time'])
+                                      'time': tuning_result[key]['Time_cost']}, ignore_index=True)
+                bests = bests.sort_values(by=['time'], ascending=True).reset_index()
                 best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
 
@@ -316,7 +316,7 @@ class automl_Optimiser():
     def report_perf(self, optimizer, X, y, title, callbacks=None):
         """
         optimizer = a sklearn or a skopt optimizer
-        X = the training set 
+        X = the training set
         y = our target
         title = a string label for the experiment
         """

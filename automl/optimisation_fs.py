@@ -84,7 +84,8 @@ class Optimiser():
                  verbose=True,
                  to_path="save",
                  parallel_strategy=True,
-                 baseEstimator=["GP", "RF"]):
+                 baseEstimator=["GP", "RF"],
+                 refit=True):
 
         self.scoring = scoring
         self.n_folds = n_folds
@@ -94,6 +95,7 @@ class Optimiser():
         self.parallel_strategy = parallel_strategy
         self.perform_scaling = False
         self.baseEstimator = baseEstimator
+        self.refit = refit
 
         if self.to_path is True:
             warnings.warn("Optimiser will save all your fitted models result ")
@@ -258,7 +260,8 @@ class Optimiser():
                                             optimizer_kwargs={'base_estimator': baseEstimator,
                                                               "acq_func": "EI"},
                                             random_state=self.random_state,
-                                            verbose=self.verbose)
+                                            verbose=self.verbose,
+                                            refit=self.refit)
                     else:
                         opt = BayesSearchCV(pipe,
                                             search_spaces=search_spaces,
@@ -270,7 +273,8 @@ class Optimiser():
                                             optimizer_kwargs={'base_estimator': baseEstimator,
                                                               "acq_func": "EI"},
                                             random_state=self.random_state,
-                                            verbose=self.verbose)
+                                            verbose=self.verbose,
+                                            refit=self.refit)
 
                     if set_callbacks is True:
                         mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
@@ -286,8 +290,8 @@ class Optimiser():
             if tuning_result[key]['best_score'] == max(d['best_score'] for d in tuning_result.values()):
                 bests = bests.append({'best_score': tuning_result[key]['best_score'],
                                       'best_SM': key,
-                                      'time': tuning_result[key]['CPU_Time']}, ignore_index=True)
-                bests.sort_values(by=['time'])
+                                      'time': tuning_result[key]['Time_cost']}, ignore_index=True)
+                bests = bests.sort_values(by=['time'], ascending=True).reset_index()
                 best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
 
