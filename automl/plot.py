@@ -45,12 +45,18 @@ def plot_all_cv_result(final_result, kpi='all_cv_results', max_iters=20):
     plt.tight_layout()
 
 
-def plot_bar(ax1, result, bar_name="BO"):
+def plot_bar(ax1, result, bar_name="BO", kpi="CPU_Time", text=True):
+    ax1.bar(bar_name, result['GP'][kpi], width=0.5, alpha=0.8, ec='grey', color="orange", ls="--")
+    ax1.text(bar_name, result['GP'][kpi], '%.0f' % result['GP'][kpi], ha='center', va='bottom', fontsize=11)
+
+    ax1.bar(bar_name, result['RF'][kpi], bottom=result['GP'][kpi], width=0.5, alpha=0.8, ec='grey', color='g', ls="--")
+    ax1.text(bar_name, result['RF'][kpi] + result['GP'][kpi], '%.0f' % result['RF'][kpi], ha='center', va='bottom', fontsize=11)
+
     for i, c in zip(result.keys(), ["orange", 'g']):
-        time = result[i]['CPU_Time']
-        ax1.bar(bar_name, time, width=0.5, alpha=0.8, ec='grey', color=c, ls="--")
-        print(bar_name + "         " + i + ' best Score:', round(result[i]['best_score'], 4), 'with', len(result[i]['all_cv_results']), 'iterations')
-        ax1.text(bar_name, time + 0.05, '%.0f' % time, ha='center', va='bottom', fontsize=11)
+        if text is True:
+            print(bar_name + " " + i + ' best Score:', round(result[i]['best_score'], 4), 'with', len(result[i]['all_cv_results']), 'iterations')
+        else:
+            pass
 
 
 def transfer_GP_to_table(result):
@@ -70,12 +76,12 @@ def transfer_RF_to_table(result):
 
 
 def plot_line(ax0, result, t_gp, t_rf, color=["orange", "g"], labelname="BO"):
-    ax0.plot(range(1, len(result["GP"]['all_cv_results']) + 1), t_gp['mean_test_score'], label=labelname + "_GP", color=color[0], marker="v", markersize=6)
+    ax0.plot(range(1, len(result["GP"]['all_cv_results']) + 1), t_gp['mean_test_score'], label=labelname + "_GP", color=color[0], linewidth=2.5)
     r_gp1 = list(map(lambda x: x[0] - x[1], zip(t_gp["mean_test_score"], t_gp["std_test_score"])))
     r_gp2 = list(map(lambda x: x[0] + x[1], zip(t_gp["mean_test_score"], t_gp["std_test_score"])))
     ax0.fill_between(range(1, len(result["GP"]['all_cv_results']) + 1), r_gp1, r_gp2, color=color[0], alpha=0.1)
 
-    ax0.plot(range(1, len(result["RF"]['all_cv_results']) + 1), t_rf['mean_test_score'], label=labelname + "_RF", color=color[1], marker="x", markersize=6)
+    ax0.plot(range(1, len(result["RF"]['all_cv_results']) + 1), t_rf['mean_test_score'], label=labelname + "_RF", color=color[1], ls="--", linewidth=2.5)
     r_rf1 = list(map(lambda x: x[0] - x[1], zip(t_rf["mean_test_score"], t_rf["std_test_score"])))
     r_rf2 = list(map(lambda x: x[0] + x[1], zip(t_rf["mean_test_score"], t_rf["std_test_score"])))
     ax0.fill_between(range(1, len(result["RF"]['all_cv_results']) + 1), r_rf1, r_rf2, color=color[1], alpha=0.1)
