@@ -3,6 +3,7 @@ import time
 import pprint
 import joblib
 import pandas as pd
+import numpy as np
 
 # Suppressing warnings because of skopt verbosity
 import warnings
@@ -25,6 +26,7 @@ from skopt.utils import use_named_args  # decorator to convert a list of paramet
 from skopt.callbacks import DeadlineStopper  # Stop the optimization before running out of a fixed budget of time.
 from skopt.callbacks import VerboseCallback  # Callback to control the verbosity
 from skopt.callbacks import DeltaYStopper  # Stop the optimization If the last two positions at which the objective has been evaluated are less than delta
+from skopt.learning import GaussianProcessRegressor
 
 # import local function
 from util import log, timeit, mprint, dump_result, load_result
@@ -232,7 +234,6 @@ class Optimiser():
                 if self.perform_scaling is True:
                     print(">>> Numerical Features have encoded with :" + scal.__class__.__name__)
                     print("")
-
                 for baseEstimator in self.baseEstimator:
                     # Pipeline creation
 
@@ -275,15 +276,26 @@ class Optimiser():
                                             random_state=self.random_state,
                                             verbose=self.verbose,
                                             refit=self.refit)
+                    if not isinstance(baseEstimator, GaussianProcessRegressor):
+                        if set_callbacks is True:
+                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
+                                                          callbacks=[self.on_step, DeadlineStopper(60 * 10)  # ,DeltaYStopper(0.000001)
+                                                                     ])
+                        else:
+                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,)
 
-                    if set_callbacks is True:
-                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator,
-                                                      callbacks=[DeltaYStopper(0.000001), DeadlineStopper(60 * 5)
-                                                                 ])
-                    else:
-                        mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator,
-                                                      )
-                    tuning_result[baseEstimator] = mid_result
+                    elif isinstance(baseEstimator, GaussianProcessRegressor):
+                        if set_callbacks is True:
+                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseEstimator.__class__.__name__,
+                                                          callbacks=[self.on_step, DeadlineStopper(60 * 10)  # ,DeltaYStopper(0.000001)
+                                                                     ])
+                        else:
+                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseEstimator.__class__.__name__,)
+
+                    if not isinstance(baseEstimator, GaussianProcessRegressor):
+                        tuning_result[baseEstimator] = mid_result
+                    elif isinstance(baseEstimator, GaussianProcessRegressor):
+                        tuning_result[baseEstimator.__class__.__name__] = mid_result
 
         bests = pd.DataFrame()
         for key in tuning_result.keys():
@@ -298,17 +310,19 @@ class Optimiser():
         print("")
         print('######## Congratulations! Here is the Best Parameters: #######')
         print('Best Score is:', tuning_result[best_base_estimator]['best_score'])
-        print('with Surrogate Model ' + best_base_estimator)
+        if not isinstance(baseEstimator, GaussianProcessRegressor):
+            print('with Surrogate Model ' + best_base_estimator)
+        else:
+            print('with Surrogate Model ' + best_base_estimator.__class__.__name__)
         pprint.pprint(best_param)
         return best_param, tuning_result
 
-    # Define Call back function
-    # def on_step(self, optim_result):
-    #     score = opt.best_score_
-    #     score_std = opt.cv_results_['std_test_score'][opt.best_index_]
-    #     if score >= 0.99:
-    #         print('Best Score >0.99,Interrupting!')
-    #         return True
+    def on_step(self, opt):
+        scores = np.sort(opt.func_vals)
+        score = scores[0]
+        #print("best score: %s" % score)
+        if score == -1:
+            return True
 
     # Reporting util for different optimizers
     def report_perf(self, optimizer, X, y, title, callbacks=None):
