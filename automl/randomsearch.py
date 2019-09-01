@@ -64,21 +64,24 @@ class randomsearch():
                 start = time.time()
                 start_cpu = time.process_time()
 
-            def on_step(optim_result):
-                score = searchcv.best_score_
-                print("best score: %s" % score)
-                if score == 0.9:
-                    print('Interrupting!')
-                    return True
+            def on_step(gp_round):
+                    scores = np.sort(gp_round.func_vals)
+                    score = scores[0]
+                   # print("best score: %s" % score)
+                    if score == -1:
+                        print('Interrupting!')
+                        return True
 
             if need_callback:
                 print('Running with Callback function....')
+
                 gp_round = dummy_minimize(func=objective,
                                           dimensions=list(param_vecs),
                                           n_calls=n_iter,
-                                          callback=[DeltaYStopper(0.0001), DeadlineStopper(60 * 5)],
+                                          callback=[on_step, DeadlineStopper(60 * 10)],#,on_stepDeltaYStopper(0.000001)
                                           random_state=self.random_state,
                                           verbose=self.verbose)
+
             else:
                 gp_round = dummy_minimize(func=objective,
                                           dimensions=list(param_vecs),
@@ -132,17 +135,17 @@ class randomsearch():
         pprint.pprint(best_param)
         return rs
 
-    def result_summary(self,random_result):
-        r =pd.DataFrame()
-        all_row=[]
+    def result_summary(self, random_result):
+        r = pd.DataFrame()
+        all_row = []
         for k in random_result:
             params = random_result[k]['params']
-            for s, t in zip(random_result[k]['all_cv_results'],random_result[k]['test_score_std']):
-                row = np.array([k,s,t])
+            for s, t in zip(random_result[k]['all_cv_results'], random_result[k]['test_score_std']):
+                row = np.array([k, s, t])
                 all_row.append(row)
-        r=r.append(all_row)
-        r.columns=['model','score','std']
-        res=r.sort_values(by=['score'], ascending=True).reset_index(drop=True) 
-        res['score'] = res['score'].astype(float)
-        res['std'] =res['std'].astype(float)
+        r = r.append(all_row)
+        r.columns = ['model', 'mean_score', 'std_score']
+        res = r.sort_values(by=['mean_score'], ascending=True).reset_index(drop=True)
+        res['mean_score'] = res['mean_score'].astype(float)
+        res['std_score'] = res['std_score'].astype(float)
         return res
