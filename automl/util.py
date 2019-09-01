@@ -117,7 +117,7 @@ def mprint(msg):
 #     return dirs
 
 
-def dump_result(data, custom_name=None, save_with_time=False):
+def dump_result(data, datanames,custom_name=None, save_with_time=False):
     if len(sys.argv) == 3:
         # default local
         ROOT_DIR = os.getcwd()
@@ -126,7 +126,8 @@ def dump_result(data, custom_name=None, save_with_time=False):
             'output': join(ROOT_DIR, 'result_output'),
         }
     path = DIRS['output']
-    datanames = listdirInMac(DIRS['input'])[0].split(".")[0]
+    #datanames = listdirInMac(DIRS['input'])[0].split(".")[0]
+    datanames=datanames
     timestr = time.strftime("%Y%m%d%H%M%S")
     if save_with_time is True:
         filename = datanames + '_' + custom_name + '_' + timestr + '.json'
