@@ -2,7 +2,7 @@ import sys
 import warnings
 from math import log
 from numbers import Number
-
+import time
 import numpy as np
 
 from scipy.optimize import fmin_l_bfgs_b
@@ -26,6 +26,7 @@ from skopt.utils import is_listlike
 from skopt.utils import is_2Dlistlike
 from skopt.utils import normalize_dimensions
 
+from util import timeit,mprint
 
 class Optimizer(object):
     """Run bayesian optimisation loop.
@@ -128,11 +129,18 @@ class Optimizer(object):
         self.rng = check_random_state(random_state)
 
         # Configure acquisition function
+        self.acq_func = acq_func
+        # monitor runtime
+        
+        self.regressiontime = None 
+        self.actime= None 
+
+        self.tt_regressiontime = []
+        self.tt_actime = []
 
         # Store and creat acquisition function set
-        self.acq_func = acq_func
         self.acq_func_kwargs = acq_func_kwargs
-
+        
         allowed_acq_funcs = ["gp_hedge", "EI", "LCB", "PI", "EIps", "PIps"]
         if self.acq_func not in allowed_acq_funcs:
             raise ValueError("expected acq_func to be in %s, got %s" %
@@ -297,6 +305,12 @@ class Optimizer(object):
         """
         if n_points is None:
             return self._ask()
+        #    if nrandom is None:
+        #        return self._ask()
+         #   else:
+        #        print("You are using serail BO now, the nrandom must be None! Reset nrandom")
+         #       nrandom = None
+        #       return self._ask()
 
         supported_strategies = ["cl_min", "cl_mean", "cl_max"]
 
@@ -477,6 +491,8 @@ class Optimizer(object):
 
         # after being "told" n_initial_points we switch from sampling
         # random points to using a surrogate model
+        #mprint("starting fit gpr......")
+        start_clock = time.time()
         if (fit and self._n_initial_points <= 0 and
                 self.base_estimator_ is not None):
             transformed_bounds = np.array(self.space.transformed_bounds)
@@ -490,8 +506,12 @@ class Optimizer(object):
                 self.gains_ -= est.predict(np.vstack(self.next_xs_))
             self.models.append(est)
 
+            #mprint("finished fit gpr......")
+            self.regressiontime=time.time()-start_clock
+            self.tt_regressiontime.append(self.regressiontime)
             # even with BFGS as optimizer we want to sample a large number
             # of points and then pick the best ones as starting points
+            start_clock_ac = time.time()
             X = self.space.transform(self.space.rvs(
                 n_samples=self.n_points, random_state=self.rng))
 
@@ -506,6 +526,7 @@ class Optimizer(object):
                 if self.acq_optimizer == "sampling":
                     next_x = X[np.argmin(values)]
 
+                    
                 # Use BFGS to find the mimimum of the acquisition function, the
                 # minimization starts from `n_restarts_optimizer` different
                 # points and the best minimum is used
@@ -527,7 +548,8 @@ class Optimizer(object):
                     cand_xs = np.array([r[0] for r in results])
                     cand_acqs = np.array([r[1] for r in results])
                     next_x = cand_xs[np.argmin(cand_acqs)]
-
+                self.actime = start_clock_ac- time.time()
+                self.tt_actime.append(self.actime)
                 # lbfgs should handle this but just in case there are
                 # precision errors.
                 if not self.space.is_categorical:
@@ -587,3 +609,9 @@ class Optimizer(object):
 
         return create_result(self.Xi, self.yi, self.space, self.rng,
                              models=self.models)
+
+    def get_regressiontime(self):
+        return(self.regressiontime)
+
+    def get_acntime(self):
+        return(self.actime)

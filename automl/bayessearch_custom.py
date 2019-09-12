@@ -2,6 +2,7 @@ from collections import defaultdict, Sized
 from functools import partial
 
 import numpy as np
+import time
 from scipy.stats import rankdata
 
 import sklearn
@@ -242,6 +243,12 @@ class BayesSearchCV(BaseSearchCV):
         self.random_state = random_state
         self.optimizer_kwargs = optimizer_kwargs
         self._check_search_space(self.search_spaces)
+        self.sur_time = None
+        self.sur_time_temp=[]
+        self.ac_time = None
+        self.ac_time_temp=[]
+        self.eval_time = None
+        self.eval_time_temp=[]
 
         super(BayesSearchCV, self).__init__(
             estimator=estimator, scoring=scoring, fit_params=fit_params,
@@ -483,10 +490,10 @@ class BayesSearchCV(BaseSearchCV):
     def _step(self, X, y, search_space, optimizer, groups=None, n_points=1):
         """Generate n_jobs parameters and evaluate them in parallel.
         """
-
+        start = time.time()
         # get parameter values to evaluate
         params = optimizer.ask(n_points=n_points, nrandom=self.nrandom)
-
+        self.sur_time = time.time()-start
         # convert parameters to python native types
         params = [[np.asscalar(np.array(v)) for v in p] for p in params]
 
@@ -499,9 +506,10 @@ class BayesSearchCV(BaseSearchCV):
         # HACK: this adds compatibility with different versions of sklearn
         refit = self.refit
         self.refit = False
+        start = time.time()
         self._fit(X, y, groups, params_dict)
         self.refit = refit
-
+        self.eval_time = time.time()-start
         # merge existing and new cv_results_
         for k in self.cv_results_:
             all_cv_results[k].extend(self.cv_results_[k])
@@ -511,9 +519,13 @@ class BayesSearchCV(BaseSearchCV):
 
         # feed the point and objective back into optimizer
         local_results = self.cv_results_['mean_test_score'][-len(params):]
-
+        #self.ac_time = None
         # optimizer minimizes objective, hence provide negative score
-        return optimizer.tell(params, [-score for score in local_results])
+        start = time.time()
+        ac_result = optimizer.tell(params, [-score for score in local_results])
+        self.ac_time = time.time()-start
+        return ac_result
+         
 
     @property
     def total_iterations(self):
@@ -574,6 +586,7 @@ class BayesSearchCV(BaseSearchCV):
 
         # Instantiate optimizers for all the search spaces.
         optimizers = []
+
         for search_space in search_spaces:
             if isinstance(search_space, tuple):
                 search_space = search_space[0]
@@ -585,15 +598,24 @@ class BayesSearchCV(BaseSearchCV):
         self.multimetric_ = False
 
         n_points = self.n_points
-
+        
+        sur_time_temp=[]
+        ac_time_temp=[]
+        eval_time_temp = []
         for search_space, optimizer in zip(search_spaces, optimizers):
+            ST=[]
+            AT=[]
+            ET=[]
+            self.sur_time_temp=[]
+            self.ac_time_temp=[]
+            self.eval_time_temp=[]
+            #print("sur_time_temp ",sur_time_temp)
             # if not provided with search subspace, n_iter is taken as
             # self.n_iter
             if isinstance(search_space, tuple):
                 search_space, n_iter = search_space
             else:
                 n_iter = self.n_iter
-
             # do the optimization for particular search space
             while n_iter > 0:
                 # when n_iter < n_points points left for evaluation
@@ -604,13 +626,39 @@ class BayesSearchCV(BaseSearchCV):
                     groups=groups, n_points=n_points_adjusted
                 )
                 n_iter -= n_points
+                
+                ST.append(self.sur_time)
+                AT.append(self.ac_time)
+                ET.append(self.eval_time)
 
                 if eval_callbacks(callbacks, optim_result):
                     print('check call back:', eval_callbacks(callbacks, optim_result))
                     break
 
+            #print("AT ",AT)
+            sur_time_temp.append(sum(ST))
+            ac_time_temp.append(sum(AT))
+            eval_time_temp.append(sum(ET))
+            #print("sur_time_temp ",sur_time_temp)
+            self.sur_time_temp=sur_time_temp
+            self.ac_time_temp=ac_time_temp
+            self.eval_time_temp = eval_time_temp
+
+
+            #print("gpr took clock time: ",sum(self.sur_time_temp) )
+            #print("ac took clock time: ",sum(self.ac_time_temp) )
         # Refit the best model on the the whole dataset
         if self.refit:
             self._fit_best_model(X, y)
 
         return self
+
+    def get_sur_time(self):
+        return round(sum(self.sur_time_temp),2)
+
+    def get_ac_time(self):
+        return round(sum(self.ac_time_temp),2)
+
+    def get_eval_time(self):
+        return round(sum(self.eval_time_temp),2)
+
