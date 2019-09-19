@@ -16,15 +16,17 @@ from sklearn.utils import check_random_state
 from skopt.acquisition import _gaussian_acquisition
 from skopt.acquisition import gaussian_acquisition_1D
 from skopt.learning import GaussianProcessRegressor
+#from gpr import GaussianProcessRegressor
+
 from skopt.space import Categorical
 from skopt.space import Space
-from skopt.utils import check_x_in_space
-from skopt.utils import cook_estimator
-from skopt.utils import create_result
-from skopt.utils import has_gradients
-from skopt.utils import is_listlike
-from skopt.utils import is_2Dlistlike
-from skopt.utils import normalize_dimensions
+from sk_utils import check_x_in_space
+from sk_utils import cook_estimator
+from sk_utils import create_result
+from sk_utils import has_gradients
+from sk_utils import is_listlike
+from sk_utils import is_2Dlistlike
+from sk_utils import normalize_dimensions
 
 from util import timeit,mprint
 
@@ -492,23 +494,23 @@ class Optimizer(object):
         # after being "told" n_initial_points we switch from sampling
         # random points to using a surrogate model
         #mprint("starting fit gpr......")
-        start_clock = time.time()
+        
         if (fit and self._n_initial_points <= 0 and
                 self.base_estimator_ is not None):
             transformed_bounds = np.array(self.space.transformed_bounds)
             est = clone(self.base_estimator_)
-
+            start_clock = time.time()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 est.fit(self.space.transform(self.Xi), self.yi)
-
+            self.regressiontime=time.time()-start_clock
+            self.tt_regressiontime.append(self.regressiontime)
             if hasattr(self, "next_xs_") and self.acq_func == "gp_hedge":
                 self.gains_ -= est.predict(np.vstack(self.next_xs_))
             self.models.append(est)
 
             #mprint("finished fit gpr......")
-            self.regressiontime=time.time()-start_clock
-            self.tt_regressiontime.append(self.regressiontime)
+            
             # even with BFGS as optimizer we want to sample a large number
             # of points and then pick the best ones as starting points
             start_clock_ac = time.time()

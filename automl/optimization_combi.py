@@ -17,6 +17,7 @@ from skopt.callbacks import DeadlineStopper
 from skopt.learning import GaussianProcessRegressor
 from skopt.utils import use_named_args
 from skopt.space import Real, Categorical, Integer
+from sklearn.gaussian_process import GaussianProcessRegressor as gpr
 
 from sklearn.metrics import make_scorer
 from sklearn.metrics import roc_auc_score
@@ -104,6 +105,9 @@ class automl_Optimiser():
         self.parallel_strategy = parallel_strategy
         self.refit = refit
         self.baseEstimator = baseEstimator
+        self.sur_t = []
+        self.ac_t = []
+        self.eval_t = []
 
         if self.to_path is True:
             warnings.warn("Optimiser will save all your fitted models result ")
@@ -319,7 +323,7 @@ class automl_Optimiser():
                 bests = bests.append({'best_score': tuning_result[key]['best_score'],
                                       'best_SM': key,
                                       'time': tuning_result[key]['Time_cost']}, ignore_index=True)
-                bests = bests.sort_values(by=['time'], ascending=True).reset_index()
+                bests = bests.sort_values(by=['time'], ascending=True).reset_index(drop=True)
                 best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
 
@@ -357,15 +361,24 @@ class automl_Optimiser():
         """
         start = time.time()
         start_cpu = time.process_time()
+        self.sur_t = []
+        self.ac_t = []
+        self.eval_t = []
         if callbacks:
             mprint(f'start tuning {title}...')
 
             optimizer.fit(X, y, callback=callbacks)
+            self.sur_t.append(optimizer.get_sur_time())
+            self.ac_t.append(optimizer.get_ac_time())
+            self.eval_t.append(optimizer.get_eval_time())
         else:
             mprint(f'start tuning {title}...')
 
             optimizer.fit(X, y)
-
+            self.sur_t.append(optimizer.get_sur_time())
+            self.ac_t.append(optimizer.get_ac_time())
+            self.eval_t.append(optimizer.get_eval_time())
+        
         time_cost_CPU = time.process_time() - start_cpu
         time_cost = time.time() - start
         result = {}
@@ -376,6 +389,9 @@ class automl_Optimiser():
         result['CPU_Time'] = round(time_cost_CPU, 0)
         result['Time_cost'] = round(time_cost, 0)
         result['all_cv_results'] = optimizer.cv_results_['mean_test_score'][:]
+        result['sur_clock_time'] = sum(self.sur_t)
+        result['ac_clock_time'] = sum(self.ac_t)
+        result['eval_clock_time'] = sum(self.eval_t)
         result['CV'] = optimizer.cv_results_
         print("")
 #        print('>' + title + ':')
@@ -384,6 +400,10 @@ class automl_Optimiser():
         cand = len(result['all_cv_results'])
         best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
+        print("Surrogate function tooks clock time: ", sum(self.sur_t))
+        print("Accqusition function tooks clock time: ", sum(self.ac_t))
+        #print("Evaluation tooks clock time: ", time_cost-sum(self.ac_t)-sum(self.sur_t))
+        print("True Evaluation tooks clock time: ", sum(self.eval_t))
         print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
