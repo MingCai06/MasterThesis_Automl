@@ -26,19 +26,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.model_selection import StratifiedKFold
 
-
 # Suppressing warnings because of skopt verbosity
 import warnings
 warnings.filterwarnings("ignore")
-
-# Model selection
-
-# Metrics
-
-# Skopt functions
-# from skopt import BayesSearchCV
-
-# import local function
 
 
 class automl_Optimiser():
@@ -105,6 +95,7 @@ class automl_Optimiser():
         self.parallel_strategy = parallel_strategy
         self.refit = refit
         self.baseEstimator = baseEstimator
+        self.best_param_ = None
         self.sur_t = []
         self.ac_t = []
         self.eval_t = []
@@ -158,7 +149,7 @@ class automl_Optimiser():
                 setattr(self, k, v)
 
     @timeit
-    def optimise_step(self, space, df_train, df_target, max_evals=20, npoints=4, nrandom=1, set_callbacks=True):
+    def optimise_step(self, df_train, df_target, npoints=1, nrandom=1, n_iter=50, set_callbacks=True):
         """Evaluates the data.
         Build the pipeline. If no parameters are set, default configuration for
         each step is used
@@ -198,124 +189,127 @@ class automl_Optimiser():
 
         mid_result = {}
         tuning_result = {}
-
-#        lgb = Classifier(strategy="LightGBM").get_estimator()
-#        rf = Classifier(strategy="RandomForest").get_estimator()
-
-        # Creating a correct space for skopt
-        if (space is None):
-            warnings.warn(
-                "Space is empty. Please define a search space. "
-                "Otherwise, call the method 'evaluate' for custom settings")
-            return dict()
-
+        if len(pd.DataFrame(X).columns) > 20:
+            search_space_LGB = Classifier(strategy="LightGBM").get_search_spaces(
+                need_feature_selection=True)
+            search_space_SVC = Classifier(strategy="SVC").get_search_spaces(
+                need_feature_selection=True)
+            search_spaces = [search_space_SVC, search_space_LGB]
         else:
+            search_space_LGB = Classifier(strategy="LightGBM").get_search_spaces(
+                need_feature_selection=False)
+            search_space_SVC = Classifier(strategy="SVC").get_search_spaces(
+                need_feature_selection=False)
+            search_spaces = [search_space_SVC, search_space_LGB]
 
-            if (len(space) == 0):
-                warnings.warn(
-                    "Space is empty. Please define a search space. "
-                    "Otherwise, call the method 'evaluate' for custom settings")
-                return dict()
-
+        # Initialize a pipeline
+        fs = None
+        for i in range(len(search_spaces)):
+            if isinstance(search_spaces, tuple):
+                for p in search_spaces[i][0].keys():
+                    if (p.startswith("fs__")):
+                        fs = feature_selector()
+                    else:
+                        print(">> Number of Features < 20, ignore feature selection")
+                        pass
             else:
-                search_spaces = space
+                for p in search_spaces[i].keys():
+                    if (p.startswith("fs__")):
+                        fs = feature_selector()
+                    else:
+                        pass
 
-                # Initialize a pipeline
-                fs = None
-                for i in range(len(search_spaces)):
-                    for p in search_spaces[i][0].keys():
-                        if (p.startswith("fs__")):
-                            fs = feature_selector()
-                        else:
-                            pass
+        # Do we need to cache transformers?
+        cache = False
 
-                # Do we need to cache transformers?
-                cache = False
-
-                if (fs is not None):
-                    if ("fs__strategy" in search_spaces):
-                        if(search_spaces["fs__strategy"] != "variance"):
-                            cache = True
-                        else:
-                            pass
+        if (fs is not None):
+            if ("fs__strategy" in search_spaces):
+                if(search_spaces["fs__strategy"] != "variance"):
+                    cache = True
                 else:
                     pass
-                mprint(f'Start turning Hyperparameters .... ')
-                print("")
-                print(">>> Categorical Features have encoded with :" +
-                      str({'strategy': ce.strategy}))
-                print("")
-                if self.perform_scaling is True:
-                    print(">>> Numerical Features have encoded with :" +
-                          scal.__class__.__name__)
-                    print("")
+        else:
+            pass
+        mprint(f'Start turning Hyperparameters .... ')
+        print("")
+        print(">>> Categorical Features have encoded with :" +
+              str({'strategy': ce.strategy}))
+        print("")
+        if self.perform_scaling is True:
+            print(">>> Numerical Features have encoded with :" +
+                  scal.__class__.__name__)
+            print("")
 
-                for baseestimator in self.baseEstimator:
-                    # Pipeline creation
+        for baseestimator in self.baseEstimator:
+            # Pipeline creation
 
-                    lgb = Classifier(strategy="LightGBM").get_estimator()
-                  #  rf = Classifier(strategy="RandomForest").get_estimator()
-                  #  svc = Classifier(strategy="SVC").get_estimator()
+            lgb = Classifier(strategy="LightGBM").get_estimator()
+          #  rf = Classifier(strategy="RandomForest").get_estimator()
+          #  svc = Classifier(strategy="SVC").get_estimator()
 
-                    if (fs is not None):
-                        if cache:
-                            pipe = Pipeline(
-                                [('fs', fs), ('model', lgb)], memory=self.to_path)
-                        else:
-                            pipe = Pipeline([('fs', fs), ('model', lgb)])
-                    else:
-                        if cache:
-                            pipe = Pipeline([('model', lgb)],
-                                            memory=self.to_path)
-                        else:
-                            pipe = Pipeline([('model', lgb)])
+            if (fs is not None):
+                if cache:
+                    pipe = Pipeline(
+                        [('fs', fs), ('model', lgb)], memory=self.to_path)
+                else:
+                    pipe = Pipeline([('fs', fs), ('model', lgb)])
+            else:
+                if cache:
+                    pipe = Pipeline([('model', lgb)],
+                                    memory=self.to_path)
+                else:
+                    pipe = Pipeline([('model', lgb)])
 
-                    if (self.parallel_strategy is True):
-                        opt = BayesSearchCV(pipe,
-                                            search_spaces=search_spaces,
-                                            scoring=self.scoring,
-                                            cv=self.cv,
-                                            n_points=npoints,
-                                            n_jobs=-1,
-                                            nrandom=nrandom,
-                                            return_train_score=False,
-                                            optimizer_kwargs={'base_estimator': baseestimator,
-                                                              "acq_func": "EI"},
-                                            random_state=self.random_state,
-                                            verbose=self.verbose,
-                                            refit=self.refit)
-                    else:
-                        opt = BayesSearchCV(pipe,
-                                            search_spaces=search_spaces,
-                                            scoring=self.scoring,
-                                            cv=self.cv,
-                                            n_points=npoints,
-                                            n_jobs=1,
-                                            nrandom=nrandom,
-                                            return_train_score=False,
-                                            optimizer_kwargs={'base_estimator': baseestimator,
-                                                              "acq_func": "EI"},
-                                            random_state=self.random_state,
-                                            verbose=self.verbose,
-                                            refit=self.refit)
+            if (self.parallel_strategy is True):
+                opt = BayesSearchCV(pipe,
+                                    search_spaces=search_spaces,
+                                    scoring=self.scoring,
+                                    cv=self.cv,
+                                    npoints=npoints,
+                                    n_jobs=-1,
+                                    n_iter=n_iter,
+                                    nrandom=nrandom,
+                                    return_train_score=False,
+                                    optimizer_kwargs={'base_estimator': baseestimator,
+                                                      "acq_func": "EI"},
+                                    random_state=self.random_state,
+                                    verbose=self.verbose,
+                                    refit=self.refit)
+            else:
+                opt = BayesSearchCV(pipe,
+                                    search_spaces=search_spaces,
+                                    scoring=self.scoring,
+                                    cv=self.cv,
+                                    npoints=npoints,
+                                    n_jobs=1,
+                                    n_iter=n_iter,
+                                    nrandom=nrandom,
+                                    return_train_score=False,
+                                    optimizer_kwargs={'base_estimator': baseestimator,
+                                                      "acq_func": "EI"},
+                                    random_state=self.random_state,
+                                    verbose=self.verbose,
+                                    refit=self.refit)
 
-                    if not isinstance(baseestimator, GaussianProcessRegressor):
-                        if set_callbacks is True:
-                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseestimator,
-                                                          callbacks=[self.on_step, DeadlineStopper(60 * 10)  # ,DeltaYStopper(0.000001)
-                                                                     ])
-                        else:
-                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseestimator,)
-                        tuning_result[baseestimator] = mid_result
+            if not isinstance(baseestimator, GaussianProcessRegressor):
+                if set_callbacks is True:
+                    mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseestimator,
+                                                  callbacks=[self.on_step, DeadlineStopper(60 * 60)  # ,DeltaYStopper(0.000001)
+                                                             ])
+                else:
+                    mid_result = self.report_perf(
+                        opt, X, df_target, ' with Surrogate Model: ' + baseestimator,)
+                tuning_result[baseestimator] = mid_result
 
-                    else:
-                        if set_callbacks is True:
-                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseestimator.__class__.__name__,
-                                                          callbacks=[self.on_step, DeadlineStopper(60 * 10)  # ,DeltaYStopper(0.000001)
-                                                                     ])
-                        else:
-                            mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model: ' + baseestimator.__class__.__name__,)
-                        tuning_result[baseestimator.__class__.__name__] = mid_result
+            else:
+                if set_callbacks is True:
+                    mid_result = self.report_perf(opt, X, df_target, ' with Surrogate Model:' + baseestimator.__class__.__name__,
+                                                  callbacks=[self.on_step, DeadlineStopper(60 * 60)  # ,DeltaYStopper(0.000001)
+                                                             ])
+                else:
+                    mid_result = self.report_perf(
+                        opt, X, df_target, ' with Surrogate Model: ' + baseestimator.__class__.__name__,)
+                tuning_result[baseestimator.__class__.__name__] = mid_result
 
         bests = pd.DataFrame()
         for key in tuning_result.keys():
@@ -323,31 +317,29 @@ class automl_Optimiser():
                 bests = bests.append({'best_score': tuning_result[key]['best_score'],
                                       'best_SM': key,
                                       'time': tuning_result[key]['Time_cost']}, ignore_index=True)
-                bests = bests.sort_values(by=['time'], ascending=True).reset_index(drop=True)
+                bests = bests.sort_values(
+                    by=['time'], ascending=True).reset_index(drop=True)
                 best_base_estimator = bests['best_SM'][0]
                 best_param = tuning_result[best_base_estimator]['best_parmas']
 
         print("")
         print('######## Congratulations! Here is the Best Parameters: #######')
-        print('Best Score is:', tuning_result[best_base_estimator]['best_score'])
+        print('Best Score is:',
+              tuning_result[best_base_estimator]['best_score'])
         try:
             print('with Surrogate Model ' + best_base_estimator)
         except:
-            print('with Surrogate Model ' + best_base_estimator.__class__.__name__)
+            print('with Surrogate Model ' +
+                  best_base_estimator.__class__.__name__)
         pprint.pprint(best_param)
+
+        self.best_param_ = best_param
+
         return best_param, tuning_result
 
-    # Define Call back function
-    # def on_step(self, optim_result):
-    #     score = opt.best_score_
-    #     score_std = opt.cv_results_['std_test_score'][opt.best_index_]
-    #     if score >= 0.99:
-    #         print('Best Score >0.99,Interrupting!')
-    #         return True
     def on_step(self, opt):
         scores = np.sort(opt.func_vals)
         score = scores[0]
-        # print("best score: %s" % score)
         if score == -1:
             return True
 
@@ -361,50 +353,36 @@ class automl_Optimiser():
         """
         start = time.time()
         start_cpu = time.process_time()
-        self.sur_t = []
-        self.ac_t = []
-        self.eval_t = []
         if callbacks:
             mprint(f'start tuning {title}...')
 
             optimizer.fit(X, y, callback=callbacks)
-            self.sur_t.append(optimizer.get_sur_time())
-            self.ac_t.append(optimizer.get_ac_time())
-            self.eval_t.append(optimizer.get_eval_time())
         else:
             mprint(f'start tuning {title}...')
 
             optimizer.fit(X, y)
-            self.sur_t.append(optimizer.get_sur_time())
-            self.ac_t.append(optimizer.get_ac_time())
-            self.eval_t.append(optimizer.get_eval_time())
-        
+
         time_cost_CPU = time.process_time() - start_cpu
         time_cost = time.time() - start
         result = {}
         result['best_score'] = optimizer.best_score_
-        result['best_score_std'] = optimizer.cv_results_['std_test_score'][optimizer.best_index_]
-        result['best_parmas'] = optimizer.best_params_
-        result['params'] = optimizer.cv_results_['params']
+        result['best_score_std'] = optimizer.get_cv_results_(
+        )['std_test_score'][optimizer.best_index_]
+        result['best_parmas'] = optimizer.best_params_["model"]
+        result['params'] = optimizer.get_cv_results_()['params']
         result['CPU_Time'] = round(time_cost_CPU, 0)
         result['Time_cost'] = round(time_cost, 0)
-        result['all_cv_results'] = optimizer.cv_results_['mean_test_score'][:]
-        result['sur_clock_time'] = sum(self.sur_t)
-        result['ac_clock_time'] = sum(self.ac_t)
-        result['eval_clock_time'] = sum(self.eval_t)
-        result['CV'] = optimizer.cv_results_
+        result['all_cv_results'] = optimizer.get_cv_results_()[
+            'mean_test_score'][:]
+        result['CV'] = optimizer.get_cv_results_()
         print("")
-#        print('>' + title + ':')
         time_cost_CPU = round(result['CPU_Time'], 0)
         time_cost = round(result['Time_cost'], 0)
         cand = len(result['all_cv_results'])
         best_cv = round(result['best_score'], 8)
         best_cv_sd = round(result['best_score_std'], 4)
-        print("Surrogate function tooks clock time: ", sum(self.sur_t))
-        print("Accqusition function tooks clock time: ", sum(self.ac_t))
-        #print("Evaluation tooks clock time: ", time_cost-sum(self.ac_t)-sum(self.sur_t))
-        print("True Evaluation tooks clock time: ", sum(self.eval_t))
-        print(f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
+        print(
+            f'took CPU Time: {time_cost_CPU}s,clock time: {time_cost}s, candidates checked:{cand} ,best CV score: {best_cv} \u00B1 {best_cv_sd}')
         print("")
 
         return result

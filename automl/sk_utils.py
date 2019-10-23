@@ -16,6 +16,8 @@ from skopt.learning import RandomForestRegressor
 from skopt.learning.gaussian_process.kernels import ConstantKernel
 from skopt.learning.gaussian_process.kernels import HammingKernel
 from skopt.learning.gaussian_process.kernels import Matern
+from skopt.learning.gaussian_process.kernels import RationalQuadratic
+from skopt.learning.gaussian_process.kernels import RBF
 
 from skopt.space import Space, Categorical, Integer, Real, Dimension
 
@@ -228,8 +230,8 @@ def has_gradients(estimator):
     estimator: sklearn BaseEstimator instance.
     """
     tree_estimators = (
-            ExtraTreesRegressor, RandomForestRegressor,
-            GradientBoostingQuantileRegressor
+        ExtraTreesRegressor, RandomForestRegressor,
+        GradientBoostingQuantileRegressor
     )
 
     # cook_estimator() returns None for "dummy minimize" aka random values only
@@ -274,7 +276,7 @@ def cook_estimator(base_estimator, space=None, **kwargs):
     """
     if isinstance(base_estimator, str):
         base_estimator = base_estimator.upper()
-        if base_estimator not in ["GP", "ET", "RF", "GBRT", "DUMMY","GPM32","GPM1"]:
+        if base_estimator not in ["GP", "ET", "RF", "GBRT", "DUMMY", "GPM32", "GPM1", "RBF", "RQ"]:
             raise ValueError("Valid strings for the base_estimator parameter "
                              " are: 'RF', 'ET', 'GP', 'GBRT' or 'DUMMY' not "
                              "%s." % base_estimator)
@@ -305,7 +307,7 @@ def cook_estimator(base_estimator, space=None, **kwargs):
             normalize_y=True, noise="gaussian",
             n_restarts_optimizer=2)
 
-    if base_estimator == "GPM32":
+    elif base_estimator == "GPM32":
         if space is not None:
             space = Space(space)
             space = Space(normalize_dimensions(space.dimensions))
@@ -329,7 +331,7 @@ def cook_estimator(base_estimator, space=None, **kwargs):
             normalize_y=True, noise="gaussian",
             n_restarts_optimizer=2)
 
-    if base_estimator == "GPM1":
+    elif base_estimator == "GPM1":
         if space is not None:
             space = Space(space)
             space = Space(normalize_dimensions(space.dimensions))
@@ -347,6 +349,32 @@ def cook_estimator(base_estimator, space=None, **kwargs):
             other_kernel = Matern(
                 length_scale=np.ones(n_dims),
                 length_scale_bounds=[(0.01, 100)] * n_dims, nu=1.5)
+
+        base_estimator = GaussianProcessRegressor(
+            kernel=cov_amplitude * other_kernel,
+            normalize_y=True, noise="gaussian",
+            n_restarts_optimizer=2)
+
+    elif base_estimator == "RBF":
+        if space is not None:
+            space = Space(space)
+            space = Space(normalize_dimensions(space.dimensions))
+            n_dims = space.transformed_n_dims
+        cov_amplitude = ConstantKernel(1.0, (0.01, 1000.0))
+        other_kernel = RBF(length_scale=np.ones(n_dims))
+
+        base_estimator = GaussianProcessRegressor(
+            kernel=cov_amplitude * other_kernel,
+            normalize_y=True, noise="gaussian",
+            n_restarts_optimizer=2)
+
+    elif base_estimator == "RQ":
+        if space is not None:
+            space = Space(space)
+            space = Space(normalize_dimensions(space.dimensions))
+            n_dims = space.transformed_n_dims
+        cov_amplitude = ConstantKernel(1.0, (0.01, 1000.0))
+        other_kernel = RationalQuadratic(length_scale=np.ones(n_dims), alpha=0.1)
 
         base_estimator = GaussianProcessRegressor(
             kernel=cov_amplitude * other_kernel,
@@ -495,13 +523,13 @@ def normalize_dimensions(dimensions):
                     Real(dimension.low, dimension.high, dimension.prior,
                          name=dimension.name,
                          transform="normalize")
-                    )
+                )
             elif isinstance(dimension, Integer):
                 transformed_dimensions.append(
                     Integer(dimension.low, dimension.high,
                             name=dimension.name,
                             transform="normalize")
-                    )
+                )
             else:
                 raise RuntimeError("Unknown dimension type "
                                    "(%s)" % type(dimension))

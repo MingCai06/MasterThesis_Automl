@@ -3,9 +3,7 @@ from functools import partial
 
 import numpy as np
 import time
-import os
 from scipy.stats import rankdata
-# import pickle
 
 import sklearn
 from sklearn.base import is_classifier, clone
@@ -16,11 +14,10 @@ from sklearn.utils.fixes import MaskedArray
 from sklearn.utils.validation import indexable, check_is_fitted
 from sklearn.metrics.scorer import check_scoring
 from itertools import product
-# from skopt import Optimizer
+#from skopt import Optimizer
 from skopt.utils import point_asdict, dimensions_aslist, eval_callbacks
 from skopt.space import check_dimension
 from skopt.callbacks import check_callback
-from skopt import dump, load
 
 from skopt_optimiser_custom import Optimizer
 
@@ -235,20 +232,17 @@ class BayesSearchCV(BaseSearchCV):
 
     def __init__(self, estimator, search_spaces, optimizer_kwargs=None,
                  n_iter=50, scoring=None, fit_params=None, n_jobs=1,
-                 npoints=1, nrandom=2, iid=True, refit=True, cv=None, verbose=0,
+                 n_points=1, nrandom=2, iid=True, refit=True, cv=None, verbose=0,
                  pre_dispatch='2*n_jobs', random_state=None,
                  error_score='raise', return_train_score=False):
 
         self.search_spaces = search_spaces
         self.n_iter = n_iter
-        self.n_points = npoints
+        self.n_points = n_points
         self.nrandom = nrandom
         self.random_state = random_state
         self.optimizer_kwargs = optimizer_kwargs
         self._check_search_space(self.search_spaces)
-        self.svc_opt = None
-        self.lgb_opt = None
-
         self.sur_time = None
         self.sur_time_temp = []
         self.ac_time = None
@@ -512,14 +506,6 @@ class BayesSearchCV(BaseSearchCV):
     def _step(self, X, y, search_space, optimizer, groups=None, n_points=1, nrandom=2):
         """Generate n_jobs parameters and evaluate them in parallel.
         """
-        if search_space['model'].categories[0].__class__.__name__ == 'SVC':
-            if self.svc_opt is not None:
-                optimizer = load('svc_opt.pkl')
-     #           print('load svc')
-        elif search_space['model'].categories[0].__class__.__name__ == 'LGBMClassifier':
-            if self.lgb_opt is not None:
-                optimizer = load('lgb_opt.pkl')
-      #          print('load lgb')
         start = time.time()
         # get parameter values to evaluate
         params = optimizer.ask(n_points=n_points, nrandom=nrandom)
@@ -550,29 +536,18 @@ class BayesSearchCV(BaseSearchCV):
 
         self.cv_results_ = all_cv_results
         self.best_index_ = np.argmax(self.cv_results_['mean_test_score'])
-        # print('best_indes', self.best_index_)
+        #print('best_indes', self.best_index_)
         # feed the point and objective back into optimizer
         local_results = self.cv_results_['mean_test_score'][-len(params):]
-        # self.ac_time = None
+        #self.ac_time = None
         # optimizer minimizes objective, hence provide negative score
         start = time.time()
         if n_points is None:
             ac_result = optimizer._tell(params, -local_results[-1])
         else:
-            ac_result = optimizer.tell(
-                params, [-score for score in local_results])
-            # print(ac_result)
+            ac_result = optimizer.tell(params, [-score for score in local_results])
+            #print(ac_result)
         self.ac_time = time.time() - start
-
-        if search_space['model'].categories[0].__class__.__name__ == 'SVC':
-            dump(optimizer, 'svc_opt.pkl')
-     #       print('dump svc')
-            self.svc_opt = True
-        elif search_space['model'].categories[0].__class__.__name__ == 'LGBMClassifier':
-            dump(optimizer, 'lgb_opt.pkl')
-      #      print('load dump')
-            self.lgb_opt = True
-
         return ac_result
 
     @property
@@ -647,90 +622,100 @@ class BayesSearchCV(BaseSearchCV):
 
         n_points = self.n_points
 
-        # if not provided with search subspace, n_iter is taken as
-        # self.n_iter
-        if isinstance(search_space, tuple):
-            search_space, n_iter = search_space
-        else:
-            n_iter = self.n_iter
-        # do the optimization for particular search space
+        if n_points != None:
+            sur_time_temp = []
+            ac_time_temp = []
+            eval_time_temp = []
+            for search_space, optimizer in zip(search_spaces, optimizers):
+                ST = []
+                AT = []
+                ET = []
+                self.sur_time_temp = []
+                self.ac_time_temp = []
+                self.eval_time_temp = []
+                #print("sur_time_temp ",sur_time_temp)
+                # if not provided with search subspace, n_iter is taken as
+                # self.n_iter
+                if isinstance(search_space, tuple):
+                    search_space, n_iter = search_space
+                else:
+                    n_iter = self.n_iter
+                # do the optimization for particular search space
+                while n_iter > 0:
+                    # when n_iter < n_points points left for evaluation
+                    n_points_adjusted = min(n_iter, n_points)
 
-        # def random_pick(space, probabilities):
-        #     import random
-        #     x = 0.51#random.uniform(0, 1)
-        #     cumulative_probability = 0.0
-        #     for item, item_probability in zip(space, probabilities):
-        #         cumulative_probability += item_probability
-        #         if x < cumulative_probability:
-        #             break
-        #     return item
-        #frac = 0.5
+                    optim_result = self._step(
+                        X, y, search_space, optimizer,
+                        groups=groups, n_points=n_points_adjusted, nrandom=self.nrandom
+                    )
+                    n_iter -= n_points
 
-        # Tompson Sampling
-        np.random.seed(55)
-        s_lgb, f_lgb = 0, 0
-        s_svc, f_svc = 0, 0
+                    ST.append(self.sur_time)
+                    AT.append(self.ac_time)
+                    ET.append(self.eval_time)
 
-        p_lgb = np.random.beta(s_lgb + 1.0, f_lgb + 1.0)
-        p_svc = np.random.beta(s_svc + 1.0, f_svc + 1.0)
+                    if eval_callbacks(callbacks, optim_result):
+                        print('check call back:', eval_callbacks(callbacks, optim_result))
+                        break
 
-        while n_iter > 0:
-            # when n_iter < n_points points left for evaluation
-            #search_space, optimizer = random_pick(list(zip(search_spaces, optimizers)), [frac, 1.0])
-            if (p_lgb >= p_svc):
-                search_space, optimizer = list(
-                    zip(search_spaces, optimizers))[0]
-            else:
-                search_space, optimizer = list(
-                    zip(search_spaces, optimizers))[1]
+                #print("AT ",AT)
+                sur_time_temp.append(sum(ST))
+                ac_time_temp.append(sum(AT))
+                eval_time_temp.append(sum(ET))
+                #print("sur_time_temp ",sur_time_temp)
+                self.sur_time_temp = sur_time_temp
+                self.ac_time_temp = ac_time_temp
+                self.eval_time_temp = eval_time_temp
 
-            if n_points != None:
-                n_points_adjusted = min(n_iter, n_points)
-                nrandom = self.nrandom
-                n_iter -= n_points
+        elif n_points is None:
+            sur_time_temp = []
+            ac_time_temp = []
+            eval_time_temp = []
+            for search_space, optimizer in zip(search_spaces, optimizers):
+                ST = []
+                AT = []
+                ET = []
+                self.sur_time_temp = []
+                self.ac_time_temp = []
+                self.eval_time_temp = []
+                #print("sur_time_temp ",sur_time_temp)
+                # if not provided with search subspace, n_iter is taken as
+                # self.n_iter
+                if isinstance(search_space, tuple):
+                    search_space, n_iter = search_space
+                else:
+                    n_iter = self.n_iter
+                # do the optimization for particular search space
+                while n_iter > 0:
+                    # when n_iter < n_points points left for evaluation
+                    #n_points_adjusted = min(n_iter, n_points)
 
-            else:
-                n_points_adjusted = None
-                nrandom = 0
-                n_iter -= 1
+                    optim_result = self._step(
+                        X, y, search_space, optimizer,
+                        groups=groups, n_points=n_points, nrandom=0
+                    )
+                    n_iter -= 1
 
-            optim_result = self._step(
-                X, y, search_space, optimizer,
-                groups=groups, n_points=n_points_adjusted, nrandom=nrandom
-            )
-            if np.mean(self.cv_results_['mean_test_score']) > abs(optim_result.fun):
-                if optim_result.x.__class__.__name__ == "SVC":
-                    f_svc += 1
-                elif optim_result.x.__class__.__name__ == "LGBMClassifier":
-                    f_lgb += 1
-            else:
-                if optim_result.x.__class__.__name__ == "SVC":
-                    s_svc += 1
-                elif optim_result.x.__class__.__name__ == "LGBMClassifier":
-                    s_lgb += 1
+                    ST.append(self.sur_time)
+                    AT.append(self.ac_time)
+                    ET.append(self.eval_time)
 
-            p_lgb = np.random.beta(s_lgb + 1.0, f_lgb + 1.0)
-            p_svc = np.random.beta(s_svc + 1.0, f_svc + 1.0)
+                    if eval_callbacks(callbacks, optim_result):
+                        print('check call back:', eval_callbacks(callbacks, optim_result))
+                        break
 
-            # if np.mean(self.cv_results_['mean_test_score']) - abs(optim_result.fun) > 0.05:
-            #     if optim_result.x.__class__.__name__ == "SVC":
-            #         frac -= abs((np.mean(optim_result.func_vals) - optim_result.fun))
-            #     else:
-            #         frac += abs(np.mean(optim_result.func_vals) - optim_result.fun)
-            #print('Now the fraction for sample classifier is ', frac)
+                #print("AT ",AT)
+                sur_time_temp.append(sum(ST))
+                ac_time_temp.append(sum(AT))
+                eval_time_temp.append(sum(ET))
+                #print("sur_time_temp ",sur_time_temp)
+                self.sur_time_temp = sur_time_temp
+                self.ac_time_temp = ac_time_temp
+                self.eval_time_temp = eval_time_temp
 
-            if eval_callbacks(callbacks, optim_result):
-                print('check call back:', eval_callbacks(
-                    callbacks, optim_result))
-                break
-
-        if os.path.exists('svc_opt.pkl'):
-            os.remove('svc_opt.pkl')
-            self.svc_opt = None
-        if os.path.exists('lgb_opt.pkl'):
-            os.remove('lgb_opt.pkl')
-            self.lgb_opt = None
-
+            #print("gpr took clock time: ",sum(self.sur_time_temp) )
+            #print("ac took clock time: ",sum(self.ac_time_temp) )
         # Refit the best model on the the whole dataset
         if self.refit:
             self._fit_best_model(X, y)
@@ -745,7 +730,3 @@ class BayesSearchCV(BaseSearchCV):
 
     def get_eval_time(self):
         return round(sum(self.eval_time_temp), 2)
-
-    def get_cv_results_(self):
-        check_is_fitted(self, 'cv_results_')
-        return self.cv_results_

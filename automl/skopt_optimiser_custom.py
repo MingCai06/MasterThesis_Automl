@@ -28,7 +28,8 @@ from sk_utils import is_listlike
 from sk_utils import is_2Dlistlike
 from sk_utils import normalize_dimensions
 
-from util import timeit,mprint
+from util import timeit, mprint
+
 
 class Optimizer(object):
     """Run bayesian optimisation loop.
@@ -133,16 +134,19 @@ class Optimizer(object):
         # Configure acquisition function
         self.acq_func = acq_func
         # monitor runtime
-        
-        self.regressiontime = None 
-        self.actime= None 
+
+        self.regressiontime = None
+        self.actime = None
 
         self.tt_regressiontime = []
         self.tt_actime = []
+        self.randompoints = []
+
+        self.values_ = None
 
         # Store and creat acquisition function set
         self.acq_func_kwargs = acq_func_kwargs
-        
+
         allowed_acq_funcs = ["gp_hedge", "EI", "LCB", "PI", "EIps", "PIps"]
         if self.acq_func not in allowed_acq_funcs:
             raise ValueError("expected acq_func to be in %s, got %s" %
@@ -365,9 +369,15 @@ class Optimizer(object):
                 else:
                     opt._tell(x, y_lie)
                 #print(f'Selected {len(X)} evaluated points')
-            for j in range(nrandom):
-                x_random = opt.ask()
-                X.append(x_random)
+            if nrandom == 0:
+                pass
+            elif nrandom > 0:
+                for j in range(nrandom):
+                    x_random = opt._ask_random()
+                    X.append(x_random)
+                    self.randompoints.append(x_random)
+            else:
+                ValueError("nrandom muss be nonnegative integer, but got ",nrandom)
             #print(f'Selected {len(X)} points')
 
         else:
@@ -425,6 +435,45 @@ class Optimizer(object):
 
             # return point computed from last call to tell()
             return next_x
+
+    def _ask_random(self):
+        """Suggest next point at which to evaluate the objective.
+        Return a random point while not at least `n_initial_points`
+        observations have been `tell`ed, after that `base_estimator` is used
+        to determine the next point.
+        """
+        X = self.space.transform(self.space.rvs(
+            n_samples=self.n_points, random_state=self.rng))
+
+        next_xs_ = []
+        for cand_acq_func in self.cand_acq_funcs_:
+            # Find the minimum of the acquisition function by randomly
+            # sampling points from the space
+            next_x = X[np.argmin(self.values_)]
+            transformed_bounds = np.array(self.space.transformed_bounds)
+            if not self.space.is_categorical:
+                next_x = np.clip(
+                    next_x, transformed_bounds[:, 0],
+                    transformed_bounds[:, 1])
+            next_xs_.append(next_x)
+
+        next_x = next_xs_[0]
+        # note the need for [0] at the end
+        _next_x = self.space.inverse_transform(next_x.reshape((1, -1)))[0]
+
+        # if not self.models:
+        #     raise RuntimeError("Random evaluations exhausted and no "
+        #                        "model has been fit.")
+
+        next_x = _next_x
+        min_delta_x = min([self.space.distance(next_x, xi)
+                           for xi in self.Xi])
+        if abs(min_delta_x) <= 1e-8:
+            warnings.warn("The objective has been evaluated "
+                          "at this point before.")
+
+        # return point computed from last call to tell()
+        return next_x
 
     def tell(self, x, y, fit=True):
         """Record an observation (or several) of the objective function.
@@ -494,23 +543,24 @@ class Optimizer(object):
         # after being "told" n_initial_points we switch from sampling
         # random points to using a surrogate model
         #mprint("starting fit gpr......")
-        
+
         if (fit and self._n_initial_points <= 0 and
                 self.base_estimator_ is not None):
+            #print('start finding next x.....')
             transformed_bounds = np.array(self.space.transformed_bounds)
             est = clone(self.base_estimator_)
             start_clock = time.time()
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 est.fit(self.space.transform(self.Xi), self.yi)
-            self.regressiontime=time.time()-start_clock
+            self.regressiontime = time.time() - start_clock
             self.tt_regressiontime.append(self.regressiontime)
             if hasattr(self, "next_xs_") and self.acq_func == "gp_hedge":
                 self.gains_ -= est.predict(np.vstack(self.next_xs_))
             self.models.append(est)
 
             #mprint("finished fit gpr......")
-            
+
             # even with BFGS as optimizer we want to sample a large number
             # of points and then pick the best ones as starting points
             start_clock_ac = time.time()
@@ -523,12 +573,12 @@ class Optimizer(object):
                     X=X, model=est, y_opt=np.min(self.yi),
                     acq_func=cand_acq_func,
                     acq_func_kwargs=self.acq_func_kwargs)
+                self.values = values
                 # Find the minimum of the acquisition function by randomly
                 # sampling points from the space
                 if self.acq_optimizer == "sampling":
                     next_x = X[np.argmin(values)]
 
-                    
                 # Use BFGS to find the mimimum of the acquisition function, the
                 # minimization starts from `n_restarts_optimizer` different
                 # points and the best minimum is used
@@ -550,7 +600,7 @@ class Optimizer(object):
                     cand_xs = np.array([r[0] for r in results])
                     cand_acqs = np.array([r[1] for r in results])
                     next_x = cand_xs[np.argmin(cand_acqs)]
-                self.actime = start_clock_ac- time.time()
+                self.actime = start_clock_ac - time.time()
                 self.tt_actime.append(self.actime)
                 # lbfgs should handle this but just in case there are
                 # precision errors.
@@ -597,6 +647,7 @@ class Optimizer(object):
 
         elif is_listlike(x):
             if not isinstance(y, Number):
+                print(type(y))
                 raise ValueError("`func` should return a scalar")
 
         else:
@@ -617,3 +668,6 @@ class Optimizer(object):
 
     def get_acntime(self):
         return(self.actime)
+
+    def get_randompoint(self):
+        return (self.randompoints)

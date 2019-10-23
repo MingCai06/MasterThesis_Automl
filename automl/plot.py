@@ -5,6 +5,65 @@ from util import log, timeit, mprint
 import pandas as pd
 
 
+def plot_convergence(results, name, color='b', ax=None, ls='-', title=None):
+    if ax is None:
+        ax = fig.add_subplot(1, 1, 1)
+    if title:
+        ax.set_title(title)
+    else:
+        if 'GP' in str.upper(name):
+            ax.set_title("Convergence plot for BO_GP")
+        elif 'RF' in str.upper(name):
+            ax.set_title("Convergence plot for BO_RF")
+        else:
+            ax.set_title("Convergence plot for RandomSearch")
+
+    ax.set_xlabel("Number of samples ")
+    ax.set_ylabel("loss")
+    ax.grid(color='grey', linestyle='--', alpha=0.6)
+
+    #colors = cm.viridis(np.linspace(0.25, 1.0, 10))
+    #color = colors[i]
+    if name:
+        label_name = name
+    else:
+        label_name = None
+
+    if isinstance(results, pd.DataFrame):
+        curr_max = None
+        best_ = []
+        for index, results in enumerate(results.values):
+            # print(results)
+            if curr_max is None:
+                curr_max_index = index
+                curr_max = float(results[1])
+                loss = float(curr_max) - 1
+                best_.append([-loss, float(results[2])])
+                # best_std_.append(results[2])
+            elif float(results[1]) > float(curr_max):
+                curr_max_index = index
+                curr_max = float(results[1])
+                #best_.append([float(curr_max), float(results[2])])
+                loss = float(curr_max) - 1
+                best_.append([-loss, float(results[2])])
+            else:
+                best_.append(best_[-1])
+
+        ax.plot(range(1, len(best_) + 1), np.mat(best_)
+                [:, 0], c=color, lw=2, label=label_name, ls=ls)  # marker=".", markersize=12,
+        r1 = []
+        r2 = []
+        for item in best_:
+            r1.append(item[0] + item[1])
+            r2.append(item[0] - item[1])
+        ax.fill_between(range(1, len(best_) + 1), r1,
+                        r2, color=color, alpha=0.05)
+    if name:
+        ax.legend(loc='best')
+    plt.tight_layout()
+    return ax
+
+
 def plot_all_cv_result(final_result, kpi='all_cv_results', max_iters=20):
     '''
     plot the result of fisrt optimizer 
@@ -61,17 +120,25 @@ def plot_bar(ax1, result, bar_name="BO", kpi="CPU_Time", text=True):
 
 def transfer_GP_to_table(result):
     df = pd.DataFrame()
-    df['mean_test_score'] = result["GP"]['CV']['mean_test_score']
-    df['std_test_score'] = result["GP"]['CV']['std_test_score']
-    df = df.sort_values(by="mean_test_score", ascending=True)
+    models = []
+    for i in range(len(result['GP']['CV']['params'])):
+        models.append(result['GP']['CV']['params'][i]['model'].__class__.__name__)
+    df['model'] = models
+    df['mean_score'] = result["GP"]['CV']['mean_test_score']
+    df['std_score'] = result["GP"]['CV']['std_test_score']
+  #  df = df.sort_values(by="model", ascending=True)
     return df
 
 
 def transfer_RF_to_table(result):
     df = pd.DataFrame()
+    models = []
+    for i in range(len(result['RF']['CV']['params'])):
+        models.append(result['RF']['CV']['params'][i]['model'].__class__.__name__)
+    df['model'] = models
     df['mean_test_score'] = result["RF"]['CV']['mean_test_score']
     df['std_test_score'] = result["RF"]['CV']['std_test_score']
-    df = df.sort_values(by="mean_test_score", ascending=True)
+   # df = df.sort_values(by="model", ascending=True)
     return df
 
 

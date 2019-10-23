@@ -4,7 +4,8 @@ import os
 from os.path import join, isfile
 import sys
 from sklearn.externals.joblib import dump, load
-
+import pandas as pd
+import numpy as np
 
 nesting_level = 0
 is_start = None
@@ -51,22 +52,9 @@ def log(entry: Any):
     space = "-" * (4 * nesting_level)
     print(f"{space}{entry}")
 
-
-def show_dataframe(df):
-    if len(df) <= 30:
-        print(f"content=\n"
-              f"{df}")
-    else:
-        print(f"dataframe is too large to show the content, over {len(df)} rows")
-
-    if len(df.dtypes) <= 100:
-        print(f"types=\n"
-              f"{df.dtypes}\n")
-    else:
-        print(f"dataframe is too wide to show the dtypes, over {len(df.dtypes)} columns")
-
-
 # log function
+
+
 def mprint(msg):
     """info"""
     from datetime import datetime
@@ -74,50 +62,7 @@ def mprint(msg):
     print(f"INFO  [{cur_time}] {msg}")
 
 
-# # wirte result
-# def init_dirs():
-
-#     if len(sys.argv) == 1:
-#         # default local
-#         root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
-#         dirs = {
-#             'data': join(root_dir, 'data'),
-#             'output': join(root_dir, 'result_output'),
-#             'prediction': join(root_dir, 'predictions')
-#         }
-
-#     elif len(sys.argv) == 3:
-#         # default local
-#         root_dir = os.path.abspath(os.path.join(os.path.dirname("__file__"), os.path.pardir))
-#         dirs = {
-#             'data': join(root_dir, 'data'),
-#             'output': join(root_dir, 'result_output'),
-#             'prediction': join(root_dir, 'predictions')
-#         }
-
-#     elif len(sys.argv) == 3:
-#         # codalab
-#         dirs = {
-#             'data': join(sys.argv[1], 'data'),
-#             'output': sys.argv[2],
-#             'prediction': join(sys.argv[1], 'res')
-#         }
-
-#     elif len(sys.argv) == 5 and sys.argv[1] == 'local':
-#         # full call in local
-#         dirs = {
-#             'prediction': join(sys.argv[2]),
-#             'ref': join(sys.argv[3]),
-#             'output': sys.argv[4]
-#         }
-#     else:
-#         raise ValueError("Wrong number of arguments")
-
-#     os.makedirs(dirs['output'], exist_ok=True)
-#     return dirs
-
-
-def dump_result(data, datanames,custom_name=None, save_with_time=False):
+def dump_result(data, datanames, custom_name=None, save_with_time=False):
     if len(sys.argv) == 3:
         # default local
         ROOT_DIR = os.getcwd()
@@ -127,7 +72,7 @@ def dump_result(data, datanames,custom_name=None, save_with_time=False):
         }
     path = DIRS['output']
     #datanames = listdirInMac(DIRS['input'])[0].split(".")[0]
-    datanames=datanames
+    datanames = datanames
     timestr = time.strftime("%Y%m%d%H%M%S")
     if save_with_time is True:
         filename = datanames + '_' + custom_name + '_' + timestr + '.json'
@@ -155,3 +100,22 @@ def listdirInMac(path):
         if item.startswith('.') and os.path.isfile(os.path.join(path, item)):
             os_list.remove(item)
     return os_list
+
+
+def result_summary(random_result):
+    r = pd.DataFrame()
+    all_row = []
+    for k in random_result:
+        try:
+            for s, t in zip(random_result[k]['all_cv_results'], random_result[k]['test_score_std']):
+                row = np.array([k, s, t])
+                all_row.append(row)
+        except:
+            for s, t in zip(random_result[k]['all_cv_results'], random_result[k]['CV']['std_score_time']):
+                row = np.array([k, s, t])
+                all_row.append(row)
+    r = r.append(all_row)
+    r.columns = ['model', 'mean_score', 'std_score']
+    r["mean_score"] = r["mean_score"].astype(float)
+    r["std_score"] = r["std_score"].astype(float)
+    return r

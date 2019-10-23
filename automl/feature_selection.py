@@ -4,6 +4,8 @@ from sklearn.linear_model import LogisticRegression
 import lightgbm as lgb
 import warnings
 # memory management
+# utility for early stopping with a validation set
+from sklearn.model_selection import train_test_split
 import gc
 
 
@@ -17,16 +19,16 @@ class feature_selector():
     strategy : str, defaut = "l1"
         The strategy to select features.
         Available strategies = {"variance", "l1", "lgb_feature_importance"}
-    threshold : float, defaut = 0.3
+    threshold : float, defaut = 0.1
         The percentage of variable to discard according to the strategy.
         Must be between 0. and 1.
     """
 
-    def __init__(self, strategy='l1', threshold=0.3):
+    def __init__(self, strategy='l1', threshold=0.1):
 
         # 'variance','l1, 'rf_feature_importance'
         self.strategy = strategy
-        # a float between 0. and 1. defaut : 0.3 ie we drop 0.3 of features
+        # a float between 0. and 1. defaut : 0.1 ie we drop 0.1 of features
         self.threshold = threshold
         self.__fitOK = False
         self.__to_discard = []
@@ -62,7 +64,7 @@ class feature_selector():
         object
             self
         """
-
+        df_train=pd.DataFrame(df_train)
         # sanity checks
         # if((type(df_train) != pd.SparseDataFrame) and
         #    (type(df_train) != pd.DataFrame) and
@@ -75,7 +77,7 @@ class feature_selector():
         if(self.strategy == 'variance'):
             coef = df_train.std()
             abstract_threshold = np.percentile(coef, 100. * self.threshold)
-            self.__to_discard = coef[coef < abstract_threshold].index
+            self.__to_discard =  coef[coef < abstract_threshold].index
             self.__fitOK = True
 
         elif(self.strategy == 'l1'):
@@ -93,7 +95,7 @@ class feature_selector():
             train_features, valid_features, train_target, valid_target = train_test_split(df_train, y_train, test_size=0.2)
             model.fit(train_features, train_target,
                       eval_set=[(valid_features, valid_target)],
-                      early_stopping_rounds=100, verbose=-1)
+                      early_stopping_rounds=100, verbose=0)
 
             # Clean up memory
             gc.enable()
@@ -105,6 +107,8 @@ class feature_selector():
             self.__to_discard = df_train.columns[coef < abstract_threshold]
             self.__fitOK = True
 
+        elif(self.strategy == None):
+            self.__fitOK = True
         else:
             raise ValueError("Strategy invalid. Please choose between "
                              "'variance', 'l1' or 'lgb_feature_importance'")
@@ -124,12 +128,11 @@ class feature_selector():
         """
 
         if(self.__fitOK):
-
+            df = pd.DataFrame(df)
             # sanity checks
             if((type(df) != pd.SparseDataFrame) and
                (type(df) != pd.DataFrame)):
-                raise ValueError("df must be a DataFrame")
-
+                raise ValueError("df must be a DataFrame,got %s" % type(df))
             return df.drop(self.__to_discard, axis=1)
         else:
             raise ValueError("call fit or fit_transform function before")
@@ -149,7 +152,7 @@ class feature_selector():
         pandas dataframe of shape = (n_train, n_features*(1-threshold))
             The train dataset with relevant features
         """
-
+        df_train=pd.DataFrame(df_train)
         self.fit(df_train, y_train)
 
         return self.transform(df_train)

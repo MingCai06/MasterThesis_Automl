@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from joblib import Parallel, delayed
-from sklearn.model_selection import train_test_split as tts
 
 # import local function
 from util import log, timeit, mprint
@@ -257,7 +256,7 @@ class Reader():
 
     @timeit
     def read_split(self, Lpath, target_name):
-        """Creates train and test datasets
+        """Creates train dataset
          Parameters
         ----------
         Lpath : list, defaut = None
@@ -270,17 +269,13 @@ class Reader():
         dict
             Dictionnary containing :
             - 'train' : pandas dataframe for train dataset
-            - 'test' : pandas dataframe for test dataset
             - 'target' : encoded pandas Serie for the target on train set (with dtype='float' for a regression or dtype='int' for a classification)
         """
 
         col = []
         col_train = []
-        col_test = []
         df_train = dict()
-        df_test = dict()
         y_train = dict()
-        y_test = dict()
 
         if (type(Lpath) != list):
 
@@ -301,24 +296,15 @@ class Reader():
             for path in Lpath:
 
                 # Reading each file
-
                 df = self.pre_clean(path, drop_duplicate=False)
-
-                # Checking if the target exists to split into test and train
-
+                # Checking if the target exists
                 if (target_name in df.columns):
 
                     is_null = df[target_name].isnull()
-                    train, test = tts(df, test_size=0.33, random_state=42)
+                    train = df
 
                     df_train[path] = train[~is_null].drop(target_name, axis=1)
-                    df_test[path] = test.drop(target_name, axis=1)
                     y_train[path] = train[target_name][~is_null]
-                    y_test[path] = test[target_name][~is_null]
-
-                else:
-
-                    df_test[path] = df
 
             del df
 
@@ -329,12 +315,6 @@ class Reader():
                 raise ValueError("You have no train dataset. "
                                  "Please check that the "
                                  "target name is correct.")
-
-            if ((sum([df_test[path].shape[0]
-                      for path in df_test.keys()]) == 0) & (self.verbose)):
-                print("")
-                print("You have no test dataset !")
-
             # Finding the common subset of features
 
             for i, df in enumerate(df_train.values()):
@@ -344,64 +324,42 @@ class Reader():
                 else:
                     col_train = list(set(col_train) & set(df.columns))
 
-            for i, df in enumerate(df_test.values()):
 
-                if (i == 0):
-                    col_test = df.columns
-                else:
-                    col_test = list(set(col_test) & set(df.columns))
-
-            # Subset of common features
-
-            col = sorted(list(set(col_train) & set(col_test)))
+            col = sorted(list(set(col_train)))
 
             if (self.verbose):
                 print("")
                 print("> Number of common features : " + str(len(col)))
 
                 ##############################################################
-                #          Creating train, test and target dataframes
+                #          Creating train and target dataframes
                 ##############################################################
 
                 print("")
-                print("gathering and crunching for train and test datasets ...")
+                print("gathering and crunching for train datasets ...")
 
             # TODO: Optimize
             df_train = pd.concat([df[col] for df in df_train.values()])
-            df_test = pd.concat([df[col] for df in df_test.values()])
             y_train = pd.concat([y for y in y_train.values()])  # optimiser !!
-            y_test = pd.concat([y for y in y_test.values()])
             # Checking shape of the target
 
             if (type(y_train) == pd.core.frame.DataFrame):
                 raise ValueError("Your train target contains more than two columns !"
                                  " Please check that only one column "
                                  "is named " + target_name)
-
-            if (type(y_test) == pd.core.frame.DataFrame):
-                raise ValueError("Your test target contains more than two columns !"
-                                 " Please check that only one column "
-                                 "is named " + target_name)
-
             else:
                 pass
 
             # Handling indices
 
             if (self.verbose):
-                print("reindexing for train and test datasets ...")
+                print("reindexing for train datasets ...")
 
             if (df_train.index.nunique() < df_train.shape[0]):
                 df_train.index = range(df_train.shape[0])
 
-            if (df_test.index.nunique() < df_test.shape[0]):
-                df_test.index = range(df_test.shape[0])
-
             if (y_train.index.nunique() < y_train.shape[0]):
                 y_train.index = range(y_train.shape[0])
-
-            if (y_test.index.nunique() < y_test.shape[0]):
-                y_test.index = range(y_test.shape[0])
 
         #    Dropping duplicates
 
@@ -421,17 +379,11 @@ class Reader():
             for var in col:
                 if (df_train[var].nunique(dropna=False) == 1):
                     del df_train[var]
-                    del df_test[var]
 
             # Missing values
-
             sparse_features = (df_train.isnull().sum()
                                / df_train.shape[0]
                                ).sort_values(ascending=False)
-            sparse_features_test = (df_test.isnull().sum()
-                                    / df_test.shape[0]
-                                    ).sort_values(ascending=False)
-
             sparse = True
             if(sparse_features.max() == 0.0):
                 sparse = False
@@ -451,7 +403,6 @@ class Reader():
                     print("> You have no missing values on train set...")
 
             high_missing_features = sparse_features[sparse_features > 0.8].index
-            high_missing_features_test = sparse_features_test[sparse_features_test > 0.8].index
 
             if len(high_missing_features) > 0:
                 if(self.verbose):
@@ -460,14 +411,6 @@ class Reader():
                     print(F'drop {len(high_missing_features)} columns')
                     print(high_missing_features)
                 df_train.drop(high_missing_features, axis=1, inplace=True)
-
-            if len(high_missing_features_test) > 0:
-                if(self.verbose):
-                    print("")
-                    print(f'dropping test set columns with high missing rate: {self.missing_threshold}...')
-                    print(F'drop {len(high_missing_features_test)} columns')
-                    print(high_missing_features_test)
-                df_test.drop(high_missing_features_test, axis=1, inplace=True)
 
             else:
                 print("")
@@ -481,8 +424,6 @@ class Reader():
                 print("> Number of numerical features:"
                       " " + str(len(df_train.dtypes[df_train.dtypes != 'object'].index)))  # noqa
                 print("> Number of training samples : " + str(df_train.shape[0]))
-                print("> Number of test samples : " + str(df_test.shape[0]))
-
             ##############################################################
             #                    Encoding target
             ##############################################################
@@ -508,9 +449,6 @@ class Reader():
                     print('Train Traget')
                     print(y_train.value_counts())
                     print("")
-                    print('Test Traget')
-                    print(y_test.value_counts())
-                    print("")
                     print("encoding target ...")
                 enc = LabelEncoder()
                 y_train = pd.Series(enc.fit_transform(y_train.values),
@@ -518,12 +456,6 @@ class Reader():
                                     name=target_name,
                                     dtype='int')
                 print("training set encoding finished")
-
-                y_test = pd.Series(enc.fit_transform(y_test.values),
-                                   index=y_test.index,
-                                   name=target_name,
-                                   dtype='int')
-                print("test set encoding finished")
 
             else:
                 if (self.verbose):
@@ -556,12 +488,6 @@ class Reader():
                 if (self.verbose):
                     print("train dumped")
 
-                df_test.to_hdf(self.to_path + '/df_test.h5', 'test')
-
-                if (self.verbose):
-                    print("test dumped")
-                    print("CPU time: %s seconds" % (time.time() - start_time))
-
             else:
                 pass
 
@@ -577,10 +503,8 @@ class Reader():
                 print("Impute the Missing Values...")
                 imp = Imputation()
                 df_train = imp.fit_transform(df_train)
-                df_test = imp.fit_transform(df_test)
                 print("")
 
             return {"train": df_train,
-                    "test": df_test,
                     "target": y_train,
-                    "y_test": y_test}
+                    }

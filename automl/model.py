@@ -30,13 +30,14 @@ class Classifier():
     def __init__(self, **params):
 
         if ("strategy" in params):
-            if params["strategy"] in ['LightGBM', 'RandomForest','SVC']:
+            if params["strategy"] in ['LightGBM', 'RandomForest', 'SVC']:
                 self.__strategy = params["strategy"]
             else:
                 raise ValueError("Strategy invalid. Please choose between "
                                  "'LightGBM' or 'RandomForest'")
         else:
-            print('You donot give any Model Strategy, defalut model <LightGBM> will be used!')
+            print(
+                'You donot give any Model Strategy, defalut model <LightGBM> will be used!')
             self.__strategy = "LightGBM"
 
         self.__classif_params = {}
@@ -100,14 +101,15 @@ class Classifier():
         self.__strategy = strategy
 
         if(strategy == "LightGBM"):
-            self.__classifier = LGBMClassifier(objective="binary",  random_state=42)
+            self.__classifier = LGBMClassifier(
+                objective="binary",  random_state=42)
 
         elif (strategy == "RandomForest"):
             self.__classifier = RandomForestClassifier(random_state=0)
 
         elif (strategy == "SVC"):
-            
-            self.__classifier = SVC(max_iter=1000,random_state=0)
+
+            self.__classifier = SVC(max_iter=1000, random_state=0)
         # Here can add other classfier
         # elif(self.strategy =="")
 
@@ -137,7 +139,8 @@ class Classifier():
         if (type(y_train) != pd.core.series.Series):
             raise ValueError("y_train must be a Series")
 
-        df_train_train, df_val, y_train_train, y_val = train_test_split(df_train, y_train, test_size=0.2)
+        df_train_train, df_val, y_train_train, y_val = train_test_split(
+            df_train, y_train, test_size=0.33)
 
         if(strategy == "LightGBM"):
             self.__classifier.fit(df_train_train.values, y_train_train,
@@ -315,7 +318,7 @@ class Classifier():
     def get_search_spaces(self, need_feature_selection=False):
         model = self.get_estimator()
         if need_feature_selection is True:
-           search_params = {
+            search_params = {
                 "LightGBM": {
                     "model": Categorical([model]),
                     "model__class_weight": Categorical(categories=['balanced', None]),
@@ -325,24 +328,24 @@ class Classifier():
                     "model__min_samples_split": Integer(2, 10),
                     "model__min_samples_leaf": Integer(1, 10),
                     "model__min_child_weight": Integer(0, 50),
-                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                    "fs__strategy": Categorical(categories=[None, 'l1', 'lgb_feature_importance', "variance"])
                 },
                 "RandomForest": {
                     "model": Categorical([model]),
                     "model__n_estimators": Integer(10, 200),
-                    "model__min_samples_split": Integer(2, 10),
+                    "model__min_samples_split": Real(0.01, 0.5),
                     "model__min_samples_leaf": Integer(1, 10),
                     "model__max_features": Categorical(categories=['sqrt', 'log2', None]),
-                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                    "fs__strategy": Categorical(categories=[None, 'l1', 'lgb_feature_importance', "variance"])
                 },
                 "SVC": {
                     "model": Categorical([model]),
-                    "model__class_weight": Categorical(categories=['balanced',None]),
-                    'model__C': (1e-6, 1e+6, 'log-uniform'),  
+                    "model__class_weight": Categorical(categories=['balanced', None]),
+                    'model__C': (1e-6, 1e+6, 'log-uniform'),
                     'model__gamma': (1e-6, 1e+1, 'log-uniform'),
-                    'model__degree': (1, 8), 
+                    'model__degree': (1, 8),
                     'model__kernel': ['linear', 'poly', 'rbf'],
-                    "fs__strategy": Categorical(categories=['l1', 'lgb_feature_importance'])
+                    "fs__strategy": Categorical(categories=[None, 'l1', 'lgb_feature_importance', "variance"])
                 }
             }
         else:
@@ -353,24 +356,24 @@ class Classifier():
                     "model__learning_rate": Real(0.01, 1.0),
                     "model__boosting_type": Categorical(categories=['gbdt', 'dart']),
                     "model__n_estimators": Integer(10, 500),
-                    "model__max_bin":Integer(100,10000),
+                    "model__max_bin": Integer(100, 10000),
                     "model__feature_fraction": Real(0.01, 1.0, 'uniform'),
-                    "model__reg_alpha":Real(1e-9, 1000, 'log-uniform'),
-                    "model__reg_lambda":Real(1e-9, 1000, 'log-uniform'),
+                    "model__reg_alpha": Real(1e-9, 1000, 'log-uniform'),
+                    "model__reg_lambda": Real(1e-9, 1000, 'log-uniform'),
                 },
                 "RandomForest": {
                     "model": Categorical([model]),
                     "model__n_estimators": Integer(10, 200),
-                    "model__min_samples_split": Integer(2, 10),
-                    "model__min_samples_leaf": Integer(1, 10),
-                    "model__max_features": Categorical(categories=['sqrt', 'log2', None])
+                    "model__min_samples_split":  Real(0.01, 0.5),
+                    "model__min_samples_leaf":  Real(0.01, 0.5),
+                    "model__max_features": Categorical(categories=['sqrt', 'log2'])
                 },
                 "SVC": {
                     "model": Categorical([model]),
-                    "model__class_weight": Categorical(categories=['balanced',None]),
-                    'model__C': (1e-6, 1e+6, 'log-uniform'),  
+                    "model__class_weight": Categorical(categories=['balanced', None]),
+                    'model__C': (1e-6, 1e+6, 'log-uniform'),
                     'model__gamma': (1e-6, 1e+1, 'log-uniform'),
-                    'model__degree': (1, 8), 
+                    'model__degree': (1, 8),
                     'model__kernel': ['linear', 'poly', 'rbf'],
                 }
             }
