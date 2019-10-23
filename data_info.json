@@ -17,4 +17,11 @@
  "MagicTelescope": "class:",
  "OVA_Breast": "Tissue", 
  "madelon": "Class",
- "sick_numeric2":"Class"}
+ "sick_numeric2":"Class",
+ "balloon":"binaryClass",
+ "dataset_44_spambase":"class",
+ "abalone":"binaryClass",
+ "cpu_small":"binaryClass",
+ "letter":"binaryClass",
+ "jasmine":"class"
+ }
