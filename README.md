@@ -34,9 +34,8 @@ data = reader.read_split(data, target_name=info['target_name'])
 
 # data is a dictionary
 # data = {"train": df_train,
-#         "test": df_test,
 #         "target": y_train,
-#         "y_test": y_test}
+#         }
 
 ```
 # Optimization
